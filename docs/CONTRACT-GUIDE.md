@@ -79,6 +79,65 @@ invariants:
 
 **Rule:** If changing this behavior would break *callers*, it's an invariant. If changing it would only affect *this module's internals*, it's an assumption.
 
+## The CONTRACT / ASSUMPTIONS Boundary
+
+CONVENTIONS.yaml defines this under `contract_design.invariants_vs_assumptions`:
+
+> CONTRACT invariants = BEHAVIORAL (what it guarantees).
+> ASSUMPTIONS = IMPLEMENTATION (how it's built).
+
+The practical test: **can an agent implement and verify this from the interface alone?** If yes, it's a CONTRACT invariant. If it depends on infrastructure, deployment config, or runtime environment, it's an ASSUMPTION.
+
+### CONTRACT invariants (behavioral, testable through the interface)
+
+```yaml
+# An agent can write a test for each of these using only the interface
+invariants:
+  - "idempotent — safe to retry"
+  - "returns max 50 results per page"
+  - "succeeds silently for non-existent emails to prevent enumeration"
+  - "completion is irreversible — completing a completed item returns ALREADY_COMPLETED"
+  - "null fields in update input are not modified"
+```
+
+These are observable through inputs and outputs. Call the interface twice with the same input — does it behave the same? Send a page request — does it cap at 50? An agent can verify all of this without knowing anything about the infrastructure.
+
+### ASSUMPTIONS (implementation, depends on infrastructure)
+
+```yaml
+# An agent CANNOT verify these from the interface — they depend on how it's deployed
+assumptions:
+  - id: retry_policy
+    category: infrastructure
+    content: "Retry 3 times with exponential backoff"
+  - id: cache_ttl
+    category: infrastructure
+    content: "Responses cached for 5 minutes"
+  - id: rate_limit
+    category: infrastructure
+    content: "Rate limited to 100 requests per minute"
+  - id: latency_slo
+    category: infrastructure
+    content: "Target response under 500ms (SLO)"
+```
+
+These depend on middleware, caching layers, deployment config, or monitoring. They're real constraints — but they're not part of the contract because swapping Redis for Memcached or changing the retry count doesn't break callers.
+
+### Gray areas
+
+Some things look like both. Use the interface test:
+
+| Statement | CONTRACT or ASSUMPTION? | Why |
+|-----------|------------------------|-----|
+| "passwords must be at least 8 characters" | CONTRACT | Agent can test: submit 7-char password, expect WEAK_PASSWORD |
+| "passwords hashed with bcrypt cost 12" | ASSUMPTION | Agent can't observe hashing algorithm from the interface |
+| "returns results ordered by created_at descending" | CONTRACT | Agent can test: create items, verify order |
+| "uses a B-tree index on created_at" | ASSUMPTION | Agent can't observe index strategy from the interface |
+| "account locked after 5 failed logins" | CONTRACT | Agent can test: fail 5 times, expect ACCOUNT_LOCKED |
+| "lockout tracked via Redis counter with 15min TTL" | ASSUMPTION | Agent can't observe the storage mechanism |
+
+When in doubt, ask: "If I replaced the entire implementation with a different stack, would this statement still need to be true for callers to work?" If yes, CONTRACT. If no, ASSUMPTION.
+
 ## Writing Good Errors
 
 ### Naming conventions
