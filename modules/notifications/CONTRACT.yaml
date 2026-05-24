@@ -1,5 +1,6 @@
 module: notifications
 version: 1
+conventions_version: 2
 status: draft
 type: regular
 

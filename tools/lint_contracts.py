@@ -1932,15 +1932,16 @@ def check_stale_requests(root, result, stale_days=7):
 # Types: 'str', 'int', 'float', 'list', 'dict', 'bool', 'any'
 _SCHEMAS = {
     'CONTRACT': {
-        'module':         {'required': True,  'type': 'str'},
-        'version':        {'required': True,  'type': 'int'},
-        'status':         {'required': True,  'type': 'str'},
-        'type':           {'required': False, 'type': 'str'},
-        'purpose':        {'required': True,  'type': 'str'},
-        'provides':       {'required': True,  'type': 'list'},
-        'consumes':       {'required': False, 'type': 'list'},
-        'constraints':    {'required': False, 'type': 'any'},
-        'contract_rules': {'required': False, 'type': 'dict'},
+        'module':               {'required': True,  'type': 'str'},
+        'version':              {'required': True,  'type': 'int'},
+        'status':               {'required': True,  'type': 'str'},
+        'type':                 {'required': False, 'type': 'str'},
+        'purpose':              {'required': True,  'type': 'str'},
+        'provides':             {'required': True,  'type': 'list'},
+        'consumes':             {'required': False, 'type': 'list'},
+        'constraints':          {'required': False, 'type': 'any'},
+        'contract_rules':       {'required': False, 'type': 'dict'},
+        'conventions_version':  {'required': False, 'type': 'int'},
     },
     'STATE': {
         'module':               {'required': True,  'type': 'str'},
