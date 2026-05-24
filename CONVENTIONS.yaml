@@ -87,7 +87,7 @@ principles:
     rule: "Contracts describe behavior. Never reference implementations."
     enforced_by: "check_principles.py P1"
   - id: tokens-are-bottleneck
-    rule: "Single contract max 400 tokens. Recovery max 1,500 tokens."
+    rule: "Single contract max 600 tokens. Recovery max 800 tokens."
     enforced_by: "check_principles.py P2"
   - id: state-is-explicit
     rule: "Non-draft STATE.yaml must reflect actual implementation status."

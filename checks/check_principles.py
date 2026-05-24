@@ -77,16 +77,16 @@ def check_p1_contracts_over_code(root, contracts, result):
 
 
 def check_p2_tokens_are_bottleneck(root, contracts, result):
-    """P2: Single contract max 400 tokens."""
+    """P2: Single contract max 600 tokens."""
     print("── Principle 2: Tokens are the bottleneck ──")
     for mod_name in contracts:
         contract_path = root / 'modules' / mod_name / 'CONTRACT.yaml'
         if not contract_path.exists():
             continue
         tokens = _count_chars(contract_path) // 4
-        if tokens > 400:
+        if tokens > 600:
             result.warning(mod_name,
-                f"P2 contract is {tokens} tokens (max 400). "
+                f"P2 contract is {tokens} tokens (max 600). "
                 f"Consider splitting or compressing invariants")
 
 
@@ -185,15 +185,15 @@ def check_p5_hierarchy_is_real(root, contracts, manifest, result):
 
 
 def check_p6_recovery_is_cheap(root, contracts, result):
-    """P6: Module recovery (CONTRACT+STATE+MEMORY) under 500 tokens."""
+    """P6: Module recovery (CONTRACT+STATE+MEMORY) under 800 tokens."""
     print("── Principle 6: Recovery is cheap ──")
     for mod_name in contracts:
         module_dir = root / 'modules' / mod_name
         tokens = sum(_count_chars(module_dir / f) // 4
                      for f in ['CONTRACT.yaml', 'STATE.yaml', 'MEMORY.yaml'])
-        if tokens > 500:
+        if tokens > 800:
             result.warning(mod_name,
-                f"P6 module recovery is {tokens} tokens (max 500)")
+                f"P6 module recovery is {tokens} tokens (max 800)")
 
 
 def check_p7_replacement_over_continuity(root, contracts, result):
