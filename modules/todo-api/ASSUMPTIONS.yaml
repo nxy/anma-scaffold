@@ -1,17 +1,9 @@
 module: todo-api
 assumptions:
   - id: postgresql_storage
-    category: infrastructure
-    content: "PostgreSQL storage with uuid primary keys"
-
-  - id: jwt_auth
-    category: security
-    content: "All endpoints require valid JWT via user-auth.verify_token"
-
-  - id: tags_storage
-    category: data
-    content: "Tags stored as JSONB array column"
+    category: todo-storage
+    content: "PostgreSQL with uuid primary keys, tags as JSONB array"
 
   - id: user_limit
-    category: data
+    category: todo-limits
     content: "Max 10,000 todos per user"

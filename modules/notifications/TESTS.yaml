@@ -2,17 +2,17 @@ module: notifications
 tests:
   - interface: send_notification
     case: valid_push
-    input: { user_id: "uuid-1", channel: "push", title: "Task done", body: "Your todo was completed", data: null }
+    input: { user_id: "uuid-1", channel: "push", title: "Task done", body: "Your todo was completed" }
     expect: { has_keys: [notification_id, sent_at] }
 
   - interface: send_notification
     case: channel_disabled
-    input: { user_id: "uuid-2", channel: "email", title: "Update", body: "Hello", data: null }
+    input: { user_id: "uuid-2", channel: "email", title: "Update", body: "Hello" }
     expect: { error: CHANNEL_DISABLED }
 
   - interface: get_notifications
     case: unread_only
-    input: { user_id: "uuid-1", unread_only: true, limit: 20, offset: 0 }
+    input: { user_id: "uuid-1", unread_only: true, limit: 20 }
     expect: { has_keys: [notifications, unread_count] }
 
   - interface: mark_read
@@ -22,10 +22,5 @@ tests:
 
   - interface: set_preferences
     case: valid_preferences
-    input: { user_id: "uuid-1", push_enabled: true, email_enabled: false, quiet_hours_start: null, quiet_hours_end: null }
+    input: { user_id: "uuid-1", push_enabled: true, email_enabled: false }
     expect: { has_keys: [success] }
-
-  - interface: set_preferences
-    case: invalid_time
-    input: { user_id: "uuid-1", push_enabled: true, email_enabled: true, quiet_hours_start: "not-a-time", quiet_hours_end: "23:00" }
-    expect: { error: INVALID_TIME_FORMAT }

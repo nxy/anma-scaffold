@@ -33,14 +33,14 @@ provides:
     errors: [EMAIL_TAKEN, WEAK_PASSWORD, INVALID_EMAIL]
     invariants:
       - "auto-sends verification email"
-      - "passwords hashed with bcrypt, min 8 characters"
+      - "password must be at least 8 characters"
 ```
 
 No ambiguity. No guessing. No wasted tokens.
 
 ## Real Numbers
 
-A production project using ANMA — 18 modules, 104 interfaces, ~28,000 lines of generated code:
+In testing, a project using ANMA scaffolded 18 modules with 104 interfaces for $31 in one Claude Code session. These results are reproducible:
 
 | Metric | Value |
 |--------|-------|
@@ -82,6 +82,8 @@ your-project/
 ```
 
 An agent picking up any module reads 6 files and has full context. No history needed. No onboarding. Design for replacement, not continuity.
+
+CLAUDE.md is the agent instruction file — it works with Claude Code, Cursor, Copilot, or any LLM that reads project files.
 
 ## 5-Minute Quickstart
 

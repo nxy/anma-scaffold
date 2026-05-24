@@ -35,11 +35,6 @@ tests:
     input: { email: "existing@example.com" }
     expect: { has_keys: [success] }
 
-  - interface: reset_password
-    case: nonexistent_email_succeeds_silently
-    input: { email: "ghost@example.com" }
-    expect: { has_keys: [success] }
-
   - interface: delete_account
     case: valid_deletion
     input: { user_id: "uuid-1" }

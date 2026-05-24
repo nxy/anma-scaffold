@@ -2,27 +2,27 @@ module: todo-api
 tests:
   - interface: create_todo
     case: valid_creation
-    input: { user_id: "uuid-1", title: "Buy groceries", description: null, tags: ["shopping"] }
+    input: { user_id: "uuid-1", title: "Buy groceries", tags: ["shopping"] }
     expect: { has_keys: [todo_id, created_at] }
 
   - interface: create_todo
     case: empty_title
-    input: { user_id: "uuid-1", title: "", description: null, tags: [] }
+    input: { user_id: "uuid-1", title: "", tags: [] }
     expect: { error: INVALID_TITLE }
 
   - interface: get_todos
     case: active_todos
-    input: { user_id: "uuid-1", status: "active", limit: 50, offset: 0 }
+    input: { user_id: "uuid-1", status: "active", limit: 50 }
     expect: { has_keys: [todos, total] }
 
   - interface: update_todo
     case: valid_update
-    input: { user_id: "uuid-1", todo_id: "uuid-2", title: "Updated title", description: null, tags: null }
+    input: { user_id: "uuid-1", todo_id: "uuid-2", title: "Updated", tags: null }
     expect: { has_keys: [todo_id, updated_at] }
 
   - interface: update_todo
     case: not_found
-    input: { user_id: "uuid-1", todo_id: "uuid-missing", title: "X", description: null, tags: null }
+    input: { user_id: "uuid-1", todo_id: "uuid-missing", title: "X", tags: null }
     expect: { error: TODO_NOT_FOUND }
 
   - interface: complete_todo

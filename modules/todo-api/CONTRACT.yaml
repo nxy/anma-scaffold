@@ -4,32 +4,28 @@ conventions_version: 2
 status: draft
 type: regular
 
-purpose: "CRUD operations for todo items with ownership, tags, and completion tracking"
+purpose: "CRUD for todo items with ownership, tags, and completion"
 
 provides:
   - id: create_todo
-    input: { user_id: uuid, title: string, description: string_nullable, tags: "string[]" }
+    input: { user_id: uuid, title: string, tags: "string[]" }
     output: { todo_id: uuid, created_at: timestamp }
-    errors: [UNAUTHORIZED, INVALID_TITLE, RATE_LIMITED]
+    errors: [UNAUTHORIZED, INVALID_TITLE]
     invariants:
-      - "title must be 1-200 characters"
-      - "tags are lowercase, max 5 per todo"
+      - "title 1-200 chars, max 5 tags"
 
   - id: get_todos
-    input: { user_id: uuid, status: enum(all|active|completed), limit: integer, offset: integer }
+    input: { user_id: uuid, status: enum(all|active|completed), limit: integer }
     output: { todos: "Todo[]", total: integer }
     errors: [UNAUTHORIZED]
     invariants:
       - "returns only todos owned by user_id"
-      - "default limit 50, max 200"
-      - "ordered by created_at descending"
 
   - id: update_todo
-    input: { user_id: uuid, todo_id: uuid, title: string_nullable, description: string_nullable, tags: "string[]_nullable" }
+    input: { user_id: uuid, todo_id: uuid, title: string_nullable, tags: "string[]_nullable" }
     output: { todo_id: uuid, updated_at: timestamp }
-    errors: [UNAUTHORIZED, TODO_NOT_FOUND, INVALID_TITLE]
+    errors: [UNAUTHORIZED, TODO_NOT_FOUND]
     invariants:
-      - "only owner can update"
       - "null fields are not modified"
 
   - id: complete_todo
@@ -37,16 +33,14 @@ provides:
     output: { todo_id: uuid, completed_at: timestamp }
     errors: [UNAUTHORIZED, TODO_NOT_FOUND, ALREADY_COMPLETED]
     invariants:
-      - "publishes BUS event for notifications"
-      - "completion is irreversible"
+      - "irreversible, publishes BUS event"
 
   - id: delete_todo
     input: { user_id: uuid, todo_id: uuid }
     output: { success: boolean }
     errors: [UNAUTHORIZED, TODO_NOT_FOUND]
     invariants:
-      - "hard delete, not soft delete"
-      - "only owner can delete"
+      - "hard delete, only owner can delete"
 
 consumes:
   - module: user-auth

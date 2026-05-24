@@ -1,17 +1,9 @@
 module: notifications
 assumptions:
   - id: push_provider
-    category: infrastructure
-    content: "Push notifications via FCM/APNs"
+    category: notify-delivery
+    content: "Push via FCM/APNs, email via SendGrid or SES"
 
-  - id: email_provider
-    category: infrastructure
-    content: "Email via SendGrid or SES"
-
-  - id: in_app_storage
-    category: data
+  - id: in_app_retention
+    category: notify-storage
     content: "In-app notifications stored in PostgreSQL, 90-day retention"
-
-  - id: bus_listener
-    category: infrastructure
-    content: "BUS listener for todo-api.complete_todo events"

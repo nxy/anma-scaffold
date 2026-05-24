@@ -4,39 +4,36 @@ conventions_version: 2
 status: draft
 type: regular
 
-purpose: "Send push notifications, emails, and in-app alerts to users"
+purpose: "Push notifications, emails, and in-app alerts"
 
 provides:
   - id: send_notification
-    input: { user_id: uuid, channel: enum(push|email|in_app), title: string, body: string, data: "object_nullable" }
+    input: { user_id: uuid, channel: enum(push|email|in_app), title: string, body: string }
     output: { notification_id: uuid, sent_at: timestamp }
     errors: [USER_NOT_FOUND, CHANNEL_DISABLED, SEND_FAILED]
     invariants:
       - "respects user notification preferences"
-      - "email notifications are rate-limited to 10/hour per user"
 
   - id: get_notifications
-    input: { user_id: uuid, unread_only: boolean, limit: integer, offset: integer }
+    input: { user_id: uuid, unread_only: boolean, limit: integer }
     output: { notifications: "Notification[]", unread_count: integer }
     errors: [UNAUTHORIZED]
     invariants:
-      - "returns in_app notifications only"
-      - "ordered by created_at descending"
+      - "returns in_app only, ordered by created_at desc"
 
   - id: mark_read
     input: { user_id: uuid, notification_ids: "uuid[]" }
     output: { updated_count: integer }
     errors: [UNAUTHORIZED]
     invariants:
-      - "silently skips already-read or non-existent IDs"
+      - "silently skips already-read or missing IDs"
 
   - id: set_preferences
-    input: { user_id: uuid, push_enabled: boolean, email_enabled: boolean, quiet_hours_start: string_nullable, quiet_hours_end: string_nullable }
+    input: { user_id: uuid, push_enabled: boolean, email_enabled: boolean }
     output: { success: boolean }
-    errors: [UNAUTHORIZED, INVALID_TIME_FORMAT]
+    errors: [UNAUTHORIZED]
     invariants:
-      - "quiet hours in HH:MM format, user's local timezone"
-      - "notifications during quiet hours are queued, not dropped"
+      - "preferences take effect immediately"
 
 consumes:
   - module: user-auth
