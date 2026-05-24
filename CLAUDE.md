@@ -85,7 +85,7 @@ depend on?" Assumptions answer "how is it built today?"
 Tokens are the bottleneck. A single contract should fit in ~600 tokens. If
 you're writing a contract that sprawls past that, the module is too big —
 split it. The full recovery payload for any module (CONTRACT + STATE + MEMORY)
-should stay under 800 tokens. Every token you waste is a token an agent
+should stay under 1,500 tokens. Every token you waste is a token an agent
 can't use for actual work.
 
 State must be explicit. If a module isn't in draft, its STATE.yaml should
