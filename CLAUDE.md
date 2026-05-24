@@ -82,10 +82,10 @@ writing "uses PostgreSQL" or "bcrypt with cost 12" in an invariant, stop —
 that's an assumption, not a contract. Invariants answer "what can callers
 depend on?" Assumptions answer "how is it built today?"
 
-Tokens are the bottleneck. A single contract should fit in ~400 tokens. If
+Tokens are the bottleneck. A single contract should fit in ~600 tokens. If
 you're writing a contract that sprawls past that, the module is too big —
 split it. The full recovery payload for any module (CONTRACT + STATE + MEMORY)
-should stay under 1,500 tokens. Every token you waste is a token an agent
+should stay under 800 tokens. Every token you waste is a token an agent
 can't use for actual work.
 
 State must be explicit. If a module isn't in draft, its STATE.yaml should
@@ -103,7 +103,7 @@ modules are invisible modules.
 
 Recovery must be cheap. Any fresh agent should be able to pick up any module
 by reading its CONTRACT.yaml, STATE.yaml, and MEMORY.yaml. If that takes
-more than 1,500 tokens, something is wrong.
+more than 800 tokens, something is wrong.
 
 Replacement beats continuity. MEMORY.yaml holds structured insights — decisions
 made, patterns discovered, warnings about edge cases. It is not a log. It is
