@@ -12,7 +12,7 @@ provides:
     errors: [EMAIL_TAKEN, WEAK_PASSWORD, INVALID_EMAIL, RATE_LIMITED]
     invariants:
       - "auto-sends verification email; unverified accounts have limited access"
-      - "passwords hashed with bcrypt, min 8 characters"
+      - "password must be at least 8 characters; rejects common passwords"
 
   - id: login
     input: { email: string, password: string }
