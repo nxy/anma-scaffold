@@ -1,0 +1,17 @@
+module: user-auth
+assumptions:
+  - id: jwt_token_expiry
+    category: infrastructure
+    content: "JWT tokens with 1-hour expiry; refresh tokens handled server-side"
+
+  - id: password_hashing
+    category: security
+    content: "bcrypt password hashing with cost factor 12"
+
+  - id: rate_limiting
+    category: security
+    content: "Rate limiting: 10 login attempts per minute per IP"
+
+  - id: verification_email
+    category: infrastructure
+    content: "Verification emails sent via notifications module BUS event"

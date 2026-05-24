@@ -1,0 +1,85 @@
+# Injected into every agent's context. Keep SMALL — every token multiplied by module count.
+# POLICY: Append-only. Never modify existing rules — deprecate and add new ones.
+
+conventions_version: 2
+
+error_format:
+  shape: { code: "STRING_CONSTANT", message: "string", details: "object | null" }
+
+interface_rules:
+  - "All inputs/outputs are JSON-serializable"
+  - "No optional fields — use explicit null types"
+  - "Timestamps: ISO 8601 UTC"
+  - "IDs: uuid v4 unless CONTRACT specifies otherwise"
+
+naming:
+  modules: kebab-case
+  interfaces: snake_case
+  errors: SCREAMING_SNAKE_CASE
+
+testing:
+  - "Every CONTRACT interface has at least one test per invariant"
+
+communication:
+  - "Never edit another module's files — use BUS/requests"
+  - "CONTRACT.yaml is truth — never infer interfaces from source"
+  - "Unmet needs → file BUS/request, don't work around it"
+
+memory:
+  max_entries: 20
+  max_content_chars: 100
+  valid_types: [decision, discovery, warning, pattern]
+  rules:
+    - "Curate, don't append — delete stale entries before adding"
+    - "One line per entry, under 100 characters"
+    - "Decisions supersede discoveries on the same topic"
+    - "Remove warnings when resolved"
+
+granularity:
+  min_interfaces: 3
+  max_interfaces: 7
+  split_threshold: 12
+
+contract_lifecycle:
+  statuses: [draft, stable, frozen, breaking-change, deprecated]
+  frozen_rules:
+    - "Frozen contracts can only be extended, never modified or removed"
+    - "Set modifying_interface and removing_interface to forbidden"
+    - "Freeze critical, widely-consumed interfaces early"
+
+context_budget:
+  warn_tokens: 2000
+  error_tokens: 3000
+
+module_types:
+  valid: [regular, infrastructure]
+  infrastructure_rules:
+    - "Infrastructure modules must be frozen — all modules depend on them"
+    - "Managed by orchestrator directly, not a regular manager"
+    - "Examples: database-core, cache-layer, auth-middleware, config-store"
+
+agent_replacement:
+  principle: "Design for replacement, not continuity"
+  rules:
+    - "Any fresh agent with zero history can take over by reading module files"
+    - "Never depend on agent memory surviving across sessions"
+    - "If knowledge is only in an agent's head, it belongs in MEMORY.yaml or CHANGELOG.yaml"
+  required_files: [CONTRACT.yaml, STATE.yaml, MEMORY.yaml, CHANGELOG.yaml, TESTS.yaml, ASSUMPTIONS.yaml]
+
+contract_design:
+  invariants_vs_assumptions:
+    rule: "CONTRACT invariants = BEHAVIORAL (what it guarantees). ASSUMPTIONS = IMPLEMENTATION (how it's built)."
+    example_invariant: "auto-sends verification email on register (callers depend on this)"
+    example_assumption: "Firebase Auth with 1-hour JWT expiry (implementation detail)"
+  error_naming:
+    patterns: ["{ENTITY}_NOT_FOUND", "{ACTION}_FAILED", "INVALID_{FIELD}"]
+    cross_cutting: [RATE_LIMITED, UNAUTHORIZED, FORBIDDEN]
+    rule: "Cross-cutting errors follow shared names. Module-specific errors use domain nouns."
+
+dependency_rules:
+  direct_vs_bus:
+    rule: "Direct (consumes) when synchronous/frequent/stable. BUS when one-time/fire-and-forget/cross-cutting."
+    example_direct: "matching → user-profiles.get_profile (synchronous, frequent)"
+    example_bus: "auth delete_account → all modules cleanup (one-to-many fan-out)"
+
+deprecated_rules: []

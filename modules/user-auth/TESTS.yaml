@@ -1,0 +1,46 @@
+module: user-auth
+tests:
+  - interface: register
+    case: valid_registration
+    input: { email: "new@example.com", password: "securePass1!", display_name: "Alice" }
+    expect: { has_keys: [user_id, token] }
+
+  - interface: register
+    case: email_taken
+    input: { email: "existing@example.com", password: "securePass1!", display_name: "Bob" }
+    expect: { error: EMAIL_TAKEN }
+
+  - interface: login
+    case: valid_credentials
+    input: { email: "existing@example.com", password: "correctPass1!" }
+    expect: { has_keys: [user_id, token] }
+
+  - interface: login
+    case: wrong_password
+    input: { email: "existing@example.com", password: "wrong" }
+    expect: { error: INVALID_CREDENTIALS }
+
+  - interface: verify_token
+    case: valid_token
+    input: { token: "valid-jwt-token" }
+    expect: { has_keys: [user_id, email, email_verified] }
+
+  - interface: verify_token
+    case: expired_token
+    input: { token: "expired-jwt-token" }
+    expect: { error: TOKEN_EXPIRED }
+
+  - interface: reset_password
+    case: valid_email
+    input: { email: "existing@example.com" }
+    expect: { has_keys: [success] }
+
+  - interface: reset_password
+    case: nonexistent_email_succeeds_silently
+    input: { email: "ghost@example.com" }
+    expect: { has_keys: [success] }
+
+  - interface: delete_account
+    case: valid_deletion
+    input: { user_id: "uuid-1" }
+    expect: { has_keys: [success] }

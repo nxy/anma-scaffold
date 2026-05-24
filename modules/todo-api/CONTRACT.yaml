@@ -1,0 +1,59 @@
+module: todo-api
+version: 1
+status: draft
+type: regular
+
+purpose: "CRUD operations for todo items with ownership, tags, and completion tracking"
+
+provides:
+  - id: create_todo
+    input: { user_id: uuid, title: string, description: string_nullable, tags: "string[]" }
+    output: { todo_id: uuid, created_at: timestamp }
+    errors: [UNAUTHORIZED, INVALID_TITLE, RATE_LIMITED]
+    invariants:
+      - "title must be 1-200 characters"
+      - "tags are lowercase, max 5 per todo"
+
+  - id: get_todos
+    input: { user_id: uuid, status: enum(all|active|completed), limit: integer, offset: integer }
+    output: { todos: "Todo[]", total: integer }
+    errors: [UNAUTHORIZED]
+    invariants:
+      - "returns only todos owned by user_id"
+      - "default limit 50, max 200"
+      - "ordered by created_at descending"
+
+  - id: update_todo
+    input: { user_id: uuid, todo_id: uuid, title: string_nullable, description: string_nullable, tags: "string[]_nullable" }
+    output: { todo_id: uuid, updated_at: timestamp }
+    errors: [UNAUTHORIZED, TODO_NOT_FOUND, INVALID_TITLE]
+    invariants:
+      - "only owner can update"
+      - "null fields are not modified"
+
+  - id: complete_todo
+    input: { user_id: uuid, todo_id: uuid }
+    output: { todo_id: uuid, completed_at: timestamp }
+    errors: [UNAUTHORIZED, TODO_NOT_FOUND, ALREADY_COMPLETED]
+    invariants:
+      - "publishes BUS event for notifications"
+      - "completion is irreversible"
+
+  - id: delete_todo
+    input: { user_id: uuid, todo_id: uuid }
+    output: { success: boolean }
+    errors: [UNAUTHORIZED, TODO_NOT_FOUND]
+    invariants:
+      - "hard delete, not soft delete"
+      - "only owner can delete"
+
+consumes:
+  - module: user-auth
+    interface: verify_token
+    required: true
+    contract_version: 1
+
+contract_rules:
+  adding_interface: allowed
+  modifying_interface: notify
+  removing_interface: breaking

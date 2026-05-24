@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+.venv/
+venv/
+env/
+
+# YAML editor backups
+*.yaml.bak
+*.yml.bak
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# ANMA generated
+checks/reports/
+*.dot
+*.png
+*.svg
+
+# Archives
+*.zip
+*.tar.gz

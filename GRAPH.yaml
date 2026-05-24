@@ -1,0 +1,15 @@
+# Auto-generated from CONTRACT consumes fields.
+# Regenerate with: python3 tools/gen_graph.py
+version: 1
+updated: 2026-05-23T00:00:00Z
+
+modules:
+  user-auth:
+    consumes: []
+    consumed_by: [todo-api, notifications]
+  todo-api:
+    consumes: [user-auth]
+    consumed_by: [notifications]
+  notifications:
+    consumes: [user-auth, todo-api]
+    consumed_by: []

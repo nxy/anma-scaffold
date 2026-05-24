@@ -1,0 +1,54 @@
+module: notifications
+version: 1
+status: draft
+type: regular
+
+purpose: "Send push notifications, emails, and in-app alerts to users"
+
+provides:
+  - id: send_notification
+    input: { user_id: uuid, channel: enum(push|email|in_app), title: string, body: string, data: "object_nullable" }
+    output: { notification_id: uuid, sent_at: timestamp }
+    errors: [USER_NOT_FOUND, CHANNEL_DISABLED, SEND_FAILED]
+    invariants:
+      - "respects user notification preferences"
+      - "email notifications are rate-limited to 10/hour per user"
+
+  - id: get_notifications
+    input: { user_id: uuid, unread_only: boolean, limit: integer, offset: integer }
+    output: { notifications: "Notification[]", unread_count: integer }
+    errors: [UNAUTHORIZED]
+    invariants:
+      - "returns in_app notifications only"
+      - "ordered by created_at descending"
+
+  - id: mark_read
+    input: { user_id: uuid, notification_ids: "uuid[]" }
+    output: { updated_count: integer }
+    errors: [UNAUTHORIZED]
+    invariants:
+      - "silently skips already-read or non-existent IDs"
+
+  - id: set_preferences
+    input: { user_id: uuid, push_enabled: boolean, email_enabled: boolean, quiet_hours_start: string_nullable, quiet_hours_end: string_nullable }
+    output: { success: boolean }
+    errors: [UNAUTHORIZED, INVALID_TIME_FORMAT]
+    invariants:
+      - "quiet hours in HH:MM format, user's local timezone"
+      - "notifications during quiet hours are queued, not dropped"
+
+consumes:
+  - module: user-auth
+    interface: verify_token
+    required: true
+    contract_version: 1
+  - module: todo-api
+    interface: complete_todo
+    required: false
+    contract_version: 1
+    via: BUS
+
+contract_rules:
+  adding_interface: allowed
+  modifying_interface: notify
+  removing_interface: breaking
