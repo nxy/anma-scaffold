@@ -31,7 +31,7 @@ Replace all of that with one contract:
 ```yaml
 module: user-auth
 version: 1
-status: stable
+status: draft
 
 provides:
   - id: register
@@ -47,12 +47,9 @@ provides:
     output: { user_id: uuid, token: string }
     errors: [INVALID_CREDENTIALS, ACCOUNT_LOCKED]
     invariants:
-      - "locks account after 5 failed attempts"
+      - "same error for wrong password and non-existent email"
 
-consumes:
-  - module: notifications
-    interface: send_notification
-    required: false
+consumes: []
 ```
 
 ```
@@ -146,7 +143,7 @@ your-project/
       TESTS.yaml        # Contract-derived test cases
       ASSUMPTIONS.yaml  # Implementation details (separate from contract)
   BUS/                  # Async inter-module communication
-  tools/                # 24 scripts for linting, scaffolding, and analysis
+  tools/                # 26 scripts for linting, scaffolding, and analysis
 ```
 
 Contracts prescribe what code must do. Assumptions describe how it's built today. The separation means you can swap implementations without breaking the contract.
