@@ -14,6 +14,7 @@ Usage:
 """
 
 import argparse
+import hashlib
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -26,6 +27,41 @@ from discover import discover_modules, get_module_domain
 TOOLS_DIR = Path(__file__).parent
 REQUIRED_FILES = ['CONTRACT.yaml', 'STATE.yaml', 'MEMORY.yaml',
                   'CHANGELOG.yaml', 'TESTS.yaml', 'ASSUMPTIONS.yaml']
+SYNC_STATE_FILE = '.anma/sync-state.yaml'
+
+
+def _sha256_file(path):
+    """Return hex sha256 of a file, or empty string if it doesn't exist."""
+    try:
+        return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+    except FileNotFoundError:
+        return ''
+
+
+def _load_sync_state(root):
+    """Load .anma/sync-state.yaml. Returns dict with tool_hash and contracts."""
+    path = Path(root) / SYNC_STATE_FILE
+    data = parse_yaml_file(str(path))
+    if not data or not isinstance(data, dict):
+        return {}
+    return data
+
+
+def _save_sync_state(root, tool_hash, contract_hashes):
+    """Write .anma/sync-state.yaml."""
+    root = Path(root)
+    (root / '.anma').mkdir(exist_ok=True)
+    lines = [
+        '# Incremental sync state. Auto-managed by sync_all.py.\n',
+        f'tool_hash: "{tool_hash}"\n',
+    ]
+    if not contract_hashes:
+        lines.append('contracts: {}\n')
+    else:
+        lines.append('contracts:\n')
+        for mod in sorted(contract_hashes):
+            lines.append(f'  {mod}: "{contract_hashes[mod]}"\n')
+    (root / SYNC_STATE_FILE).write_text(''.join(lines))
 
 
 def timestamp_now():
@@ -68,7 +104,7 @@ def ensure_stub(filepath, module_name):
         )
 
 
-def sync_all(root, regenerate_only=False):
+def sync_all(root, regenerate_only=False, force=False):
     root = Path(root).resolve()
     created = []
     updated = []
@@ -104,13 +140,34 @@ def sync_all(root, regenerate_only=False):
                 bus_dir = mod_dir / 'BUS' / bus_sub
                 bus_dir.mkdir(parents=True, exist_ok=True)
 
-        # Step 2: Regenerate TESTS.yaml for each module (skip if no interfaces)
+        # Step 2: Regenerate TESTS.yaml for each module (hash-based incremental)
+        tool_hash = _sha256_file(TOOLS_DIR / 'gen_tests.py')
+        state = {} if force else _load_sync_state(root)
+        stored_tool_hash = state.get('tool_hash', '')
+        stored_contracts = state.get('contracts', {}) or {}
+        tool_changed = (stored_tool_hash != tool_hash)
+        if force:
+            pass  # full regen, no message
+        elif tool_changed and stored_tool_hash:
+            print("  gen_tests.py changed — full regeneration")
+
+        new_contract_hashes = {}
         for mod_name in module_names:
             mod_dir = module_paths[mod_name]
-            contract = parse_yaml_file(str(mod_dir / 'CONTRACT.yaml')) or {}
+            contract_path = mod_dir / 'CONTRACT.yaml'
+            contract = parse_yaml_file(str(contract_path)) or {}
             provides = contract.get('provides', [])
             if not provides or not isinstance(provides, list):
                 print(f"  Skipped {mod_name}/TESTS.yaml (no interfaces yet)")
+                continue
+
+            current_hash = _sha256_file(contract_path)
+            new_contract_hashes[mod_name] = current_hash
+
+            if (not force and not tool_changed
+                    and stored_contracts.get(mod_name) == current_hash
+                    and (mod_dir / 'TESTS.yaml').exists()):
+                print(f"  Skipped {mod_name}/TESTS.yaml (unchanged)")
                 continue
 
             tests_path = mod_dir / 'TESTS.yaml'
@@ -125,6 +182,10 @@ def sync_all(root, regenerate_only=False):
             else:
                 err = result.stderr.strip() or result.stdout.strip()
                 print(f"  WARNING: gen_tests.py failed for {mod_name}: {err}")
+                # Drop hash so next run will retry
+                new_contract_hashes.pop(mod_name, None)
+
+        _save_sync_state(root, tool_hash, new_contract_hashes)
 
     # Step 3: Regenerate GRAPH.yaml
     print()
@@ -253,8 +314,10 @@ def main():
     parser.add_argument('--path', default='.', help='Project root path')
     parser.add_argument('--regenerate-only', action='store_true',
                         help='Only regenerate GRAPH and MANIFEST (skip stubs and TESTS)')
+    parser.add_argument('--force', action='store_true',
+                        help='Skip hash checks and regenerate all TESTS.yaml')
     args = parser.parse_args()
-    sync_all(args.path, regenerate_only=args.regenerate_only)
+    sync_all(args.path, regenerate_only=args.regenerate_only, force=args.force)
 
 
 if __name__ == '__main__':

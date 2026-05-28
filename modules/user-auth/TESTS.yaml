@@ -1,41 +1,57 @@
+# Auto-generated test stubs. Review and customize before using.
 module: user-auth
 tests:
   - interface: register
-    case: valid_registration
-    input: { email: "new@example.com", password: "securePass1!", display_name: "Alice" }
-    expect: { has_keys: [user_id, token] }
+    case: register_success
+    input: { email: "test@test.com", password: "test_password_123", display_name: "test_display_name" }
+    expect:
+      has_keys: [user_id, token]
 
   - interface: register
-    case: email_taken
-    input: { email: "existing@example.com", password: "securePass1!", display_name: "Bob" }
-    expect: { error: EMAIL_TAKEN }
+    case: register_email_taken
+    input: { email: "test@test.com", password: "test_password_123", display_name: "test_display_name" }
+    expect:
+      error: EMAIL_TAKEN
 
   - interface: login
-    case: valid_credentials
-    input: { email: "existing@example.com", password: "correctPass1!" }
-    expect: { has_keys: [user_id, token] }
+    case: login_success
+    input: { email: "test@test.com", password: "test_password_123" }
+    expect:
+      has_keys: [user_id, token]
 
   - interface: login
-    case: wrong_password
-    input: { email: "existing@example.com", password: "wrong" }
-    expect: { error: INVALID_CREDENTIALS }
+    case: login_invalid_credentials
+    input: { email: "not-an-email", password: "test_password_123" }
+    expect:
+      error: INVALID_CREDENTIALS
 
   - interface: verify_token
-    case: valid_token
-    input: { token: "valid-jwt-token" }
-    expect: { has_keys: [user_id, email, email_verified] }
+    case: verify_token_success
+    input: { token: "test_token_abc" }
+    expect:
+      has_keys: [user_id, email, email_verified]
 
   - interface: verify_token
-    case: expired_token
-    input: { token: "expired-jwt-token" }
-    expect: { error: TOKEN_EXPIRED }
+    case: verify_token_token_expired
+    input: { token: "test_token_abc" }
+    expect:
+      error: TOKEN_EXPIRED
 
   - interface: reset_password
-    case: valid_email
-    input: { email: "existing@example.com" }
-    expect: { has_keys: [success] }
+    case: reset_password_success
+    input: { email: "test@test.com" }
+    expect:
+      has_keys: [success]
+
+  - interface: reset_password
+    case: reset_password_invalid_email
+    input: { email: "not-an-email" }
+    expect:
+      error: INVALID_EMAIL
 
   - interface: delete_account
-    case: valid_deletion
-    input: { user_id: "uuid-1" }
-    expect: { has_keys: [success] }
+    case: delete_account_success
+    input: { user_id: "test-uuid-001" }
+    expect:
+      has_keys: [success]
+

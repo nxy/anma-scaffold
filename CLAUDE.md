@@ -135,7 +135,7 @@ Agents don't skip steps. Agents don't read source before contracts.
 
 ## Domain scaling (projects with 8+ modules)
 
-For larger projects, modules can be grouped into domains:
+Always organize modules into domains under `domains/<domain>/`:
 
     domains/<domain>/<module>/CONTRACT.yaml ...
 
