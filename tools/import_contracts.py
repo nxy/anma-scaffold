@@ -14,6 +14,7 @@ Usage:
 """
 
 import argparse
+import re
 import shutil
 import subprocess
 import sys
@@ -24,6 +25,8 @@ from lint_contracts import parse_yaml_file
 from discover import discover_modules
 
 TOOLS_DIR = Path(__file__).parent
+
+KEBAB_RE = re.compile(r'^[a-z][a-z0-9]*(-[a-z0-9]+)*$')
 
 
 def extract_module_name(filepath):
@@ -59,6 +62,14 @@ def import_contract(filepath, root, force=False, existing_paths=None, domain=Non
         print(f"    Name files as <module-name>-CONTRACT.yaml")
         return False
 
+    if not KEBAB_RE.match(module_name):
+        print(f"  ✗ {filepath.name}: invalid module name '{module_name}' (must be kebab-case)")
+        return False
+
+    if domain and not KEBAB_RE.match(domain):
+        print(f"  ✗ invalid domain '{domain}' (must be kebab-case)")
+        return False
+
     if existing_paths is None:
         try:
             existing_paths = discover_modules(root)
@@ -71,6 +82,11 @@ def import_contract(filepath, root, force=False, existing_paths=None, domain=Non
         module_dir = root / "domains" / domain / module_name
     else:
         module_dir = root / "modules" / module_name
+
+    if not module_dir.resolve().is_relative_to(root.resolve()):
+        print(f"  ✗ {module_name}: resolved path escapes project root")
+        return False
+
     target = module_dir / "CONTRACT.yaml"
 
     if target.exists() and not force:
@@ -99,6 +115,10 @@ def main():
     args = parser.parse_args()
 
     root = Path(args.path).resolve()
+
+    if args.domain and not KEBAB_RE.match(args.domain):
+        print(f"ERROR: '{args.domain}' is not valid kebab-case for --domain")
+        sys.exit(1)
 
     # Verify this is an ANMA project
     if not (root / "CONVENTIONS.yaml").exists():

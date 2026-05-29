@@ -223,6 +223,11 @@ def main():
         print(f"ERROR: '{name}' is not valid kebab-case")
         sys.exit(1)
 
+    # Validate domain is kebab-case
+    if args.domain and not re.match(r'^[a-z][a-z0-9]*(-[a-z0-9]+)*$', args.domain):
+        print(f"ERROR: --domain '{args.domain}' is not valid kebab-case")
+        sys.exit(1)
+
     # Discover existing modules across flat and domain layouts
     try:
         existing_paths = discover_modules(root)

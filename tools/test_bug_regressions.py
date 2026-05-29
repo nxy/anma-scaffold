@@ -559,5 +559,155 @@ class TestBug017ManagerRollbackOnFailure(unittest.TestCase):
                              "Orphan manager directory should be cleaned up on failure")
 
 
+# ---------------------------------------------------------------------------
+# SEC-001: import_contracts.py path traversal via malicious module: field
+# ---------------------------------------------------------------------------
+
+class TestSec001ImportPathTraversal(unittest.TestCase):
+
+    def test_traversal_in_yaml_module_field_rejected(self):
+        """A CONTRACT.yaml with module: '../../tmp/evil' must be rejected."""
+        from import_contracts import import_contract
+        with TempProject() as tp:
+            tp.setup_conventions()
+            tp.setup_manifest()
+            malicious = tp.add_file('evil.yaml',
+                'module: "../../tmp/evil"\nversion: 1\nstatus: draft\n'
+                'type: regular\npurpose: "pwn"\nprovides: []\nconsumes: []\n')
+            result = import_contract(malicious, tp.root)
+            self.assertFalse(result, "Import should reject traversal in module name")
+            self.assertFalse((tp.root / '../../tmp/evil').exists())
+
+    def test_traversal_in_domain_arg_rejected(self):
+        """--domain with '../' must be rejected."""
+        from import_contracts import import_contract
+        with TempProject() as tp:
+            tp.setup_conventions()
+            tp.setup_manifest()
+            contract = tp.add_file('my-mod-CONTRACT.yaml',
+                'module: my-mod\nversion: 1\nstatus: draft\n'
+                'type: regular\npurpose: "test"\nprovides: []\nconsumes: []\n')
+            result = import_contract(contract, tp.root, domain='../../tmp/evil')
+            self.assertFalse(result, "Import should reject traversal in domain")
+
+    def test_valid_kebab_module_accepted(self):
+        """A valid kebab-case module name must still be accepted."""
+        from import_contracts import import_contract
+        with TempProject() as tp:
+            tp.setup_conventions()
+            tp.setup_manifest()
+            contract = tp.add_file('my-mod-CONTRACT.yaml',
+                'module: my-mod\nversion: 1\nstatus: draft\n'
+                'type: regular\npurpose: "test"\nprovides: []\nconsumes: []\n')
+            result = import_contract(contract, tp.root)
+            self.assertTrue(result)
+            self.assertTrue((tp.root / 'modules' / 'my-mod' / 'CONTRACT.yaml').exists())
+
+
+# ---------------------------------------------------------------------------
+# SEC-002: new_module.py path traversal via --domain
+# ---------------------------------------------------------------------------
+
+class TestSec002NewModuleDomainTraversal(unittest.TestCase):
+
+    def test_traversal_domain_rejected(self):
+        """new_module.py --domain '../../../tmp/evil' must exit non-zero."""
+        with TempProject() as tp:
+            tp.setup_conventions()
+            tp.setup_manifest()
+            tp.setup_graph()
+            result = subprocess.run(
+                [sys.executable, str(TOOLS_DIR / 'new_module.py'), 'my-mod',
+                 '--domain', '../../tmp/evil', '--path', str(tp.root)],
+                capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('not valid kebab-case', result.stdout + result.stderr)
+
+    def test_valid_domain_accepted(self):
+        """new_module.py --domain 'backend' must succeed."""
+        with TempProject() as tp:
+            tp.setup_conventions()
+            tp.setup_manifest()
+            tp.setup_graph()
+            result = subprocess.run(
+                [sys.executable, str(TOOLS_DIR / 'new_module.py'), 'my-mod',
+                 '--domain', 'backend', '--path', str(tp.root)],
+                capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0)
+            self.assertTrue((tp.root / 'domains' / 'backend' / 'my-mod').exists())
+
+
+# ---------------------------------------------------------------------------
+# SEC-003: claims.py YAML injection via special characters
+# ---------------------------------------------------------------------------
+
+class TestSec003ClaimsYamlInjection(unittest.TestCase):
+
+    def test_double_quote_in_by_roundtrips(self):
+        """A 'by' field containing double quotes must survive save/load."""
+        from claims import _save_claims, _load_claims
+        with TempProject() as tp:
+            claims = {'test-mod': {
+                'by': 'foo", injected: true, x: "bar',
+                'branch': 'main',
+                'since': '2026-01-01T00:00:00Z',
+            }}
+            _save_claims(tp.root, claims)
+            loaded = _load_claims(tp.root)
+            self.assertEqual(loaded['test-mod']['by'], 'foo", injected: true, x: "bar')
+
+    def test_colon_in_by_roundtrips(self):
+        """A 'by' field with YAML-special ':' must round-trip correctly."""
+        from claims import _save_claims, _load_claims
+        with TempProject() as tp:
+            claims = {'test-mod': {
+                'by': 'agent: admin',
+                'branch': 'feature/test',
+                'since': '2026-01-01T00:00:00Z',
+            }}
+            _save_claims(tp.root, claims)
+            loaded = _load_claims(tp.root)
+            self.assertEqual(loaded['test-mod']['by'], 'agent: admin')
+
+    def test_yaml_boolean_word_stays_string(self):
+        """'yes' as by-field must stay string, not become boolean."""
+        from claims import _save_claims, _load_claims
+        with TempProject() as tp:
+            claims = {'mod': {'by': 'yes', 'branch': 'main', 'since': '2026-01-01T00:00:00Z'}}
+            _save_claims(tp.root, claims)
+            loaded = _load_claims(tp.root)
+            self.assertIsInstance(loaded['mod']['by'], str)
+            self.assertEqual(loaded['mod']['by'], 'yes')
+
+    def test_newline_in_branch_roundtrips(self):
+        """A branch containing newlines must not corrupt the file."""
+        from claims import _save_claims, _load_claims
+        with TempProject() as tp:
+            claims = {'test-mod': {
+                'by': 'user',
+                'branch': 'line1\nline2',
+                'since': '2026-01-01T00:00:00Z',
+            }}
+            _save_claims(tp.root, claims)
+            loaded = _load_claims(tp.root)
+            self.assertEqual(loaded['test-mod']['branch'], 'line1\nline2')
+
+    def test_claims_file_is_valid_yaml(self):
+        """claims.yaml must always be parseable after save with adversarial input."""
+        from claims import _save_claims, _load_claims
+        with TempProject() as tp:
+            claims = {
+                'mod-a': {'by': '{evil: true}', 'branch': '[1,2,3]', 'since': 'null'},
+                'mod-b': {'by': '# comment', 'branch': '---', 'since': '!!python/object:os.system'},
+            }
+            _save_claims(tp.root, claims)
+            raw = (tp.root / '.anma' / 'claims.yaml').read_text()
+            import yaml
+            parsed = yaml.safe_load(raw)
+            self.assertIsNotNone(parsed)
+            self.assertIn('mod-a', parsed.get('claims', {}))
+            self.assertIn('mod-b', parsed.get('claims', {}))
+
+
 if __name__ == '__main__':
     unittest.main()

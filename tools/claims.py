@@ -5,6 +5,7 @@ import argparse
 import os
 import subprocess
 import sys
+import yaml
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -40,17 +41,9 @@ def _save_claims(root, claims):
     root = Path(root)
     path = root / CLAIMS_FILE
     (root / CLAIMS_DIR).mkdir(exist_ok=True)
-    lines = ['# Who is working on what. Updated via: anma claim / anma release\n']
-    if not claims:
-        lines.append('claims: {}\n')
-    else:
-        lines.append('claims:\n')
-        for mod, info in sorted(claims.items()):
-            by = info.get('by', 'unknown')
-            branch = info.get('branch', 'unknown')
-            since = info.get('since', '')
-            lines.append(f'  {mod}: {{ by: "{by}", branch: "{branch}", since: "{since}" }}\n')
-    path.write_text(''.join(lines))
+    header = '# Who is working on what. Updated via: anma claim / anma release\n'
+    body = yaml.safe_dump({'claims': claims or {}}, default_flow_style=False, sort_keys=True)
+    path.write_text(header + body)
 
 
 def add_claim(root, module, by=None, branch=None):
