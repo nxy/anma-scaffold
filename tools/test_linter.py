@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 # Import linter
@@ -27,6 +28,7 @@ from lint_contracts import (
     check_module_types, check_assumptions, check_changelog,
     check_replacement_ready, check_bus, check_assumption_compatibility,
     check_managers_orchestrator, check_delta_accuracy,
+    check_version_pinning, check_stale_requests, check_schemas,
 )
 
 TOOLS_DIR = Path(__file__).parent
@@ -1087,6 +1089,736 @@ class TestDomainScaling(unittest.TestCase):
             result = _run_gateway(tp.root, contracts)
             errs = [e for e in result.errors if 'ghost' in str(e)]
             self.assertTrue(errs, f"Expected missing-module error: {result.errors}")
+
+
+class TestCrossReferencesEdge(unittest.TestCase):
+    """Dedicated trigger/pass tests for check_cross_references (Check 1)."""
+
+    def test_consumes_nonexistent_module(self):
+        """consumes a module that doesn't exist -> error."""
+        contracts = {'a': {'consumes': [{'module': 'ghost', 'interface': 'do_thing', 'required': True}]}}
+        r = LintResult()
+        check_cross_references(contracts, contracts, r)
+        self.assertGreaterEqual(len(r.errors), 1)
+
+    def test_consumes_nonexistent_interface(self):
+        """consumes an interface that doesn't exist in target -> error."""
+        contracts = {
+            'a': {'consumes': [{'module': 'b', 'interface': 'missing_func', 'required': True}]},
+            'b': {'provides': [{'id': 'real_func'}]},
+        }
+        r = LintResult()
+        check_cross_references(contracts, contracts, r)
+        self.assertGreaterEqual(len(r.errors), 1)
+
+    def test_valid_cross_reference(self):
+        """Valid consumes reference -> no errors."""
+        contracts = {
+            'a': {'consumes': [{'module': 'b', 'interface': 'do_thing', 'required': True}]},
+            'b': {'provides': [{'id': 'do_thing'}]},
+        }
+        r = LintResult()
+        check_cross_references(contracts, contracts, r)
+        self.assertTrue(r.ok())
+
+    def test_consumes_entry_missing_interface_field(self):
+        """consumes entry without 'interface' key -> error."""
+        contracts = {
+            'a': {'consumes': [{'module': 'b', 'required': True}]},
+            'b': {'provides': [{'id': 'do_thing'}]},
+        }
+        r = LintResult()
+        check_cross_references(contracts, contracts, r)
+        self.assertGreaterEqual(len(r.errors), 1)
+
+    def test_consumes_entry_missing_module_field(self):
+        """consumes entry without 'module' key -> error."""
+        contracts = {'a': {'consumes': [{'interface': 'do_thing'}]}}
+        r = LintResult()
+        check_cross_references(contracts, contracts, r)
+        self.assertGreaterEqual(len(r.errors), 1)
+
+
+class TestGraphConsistencyEdge(unittest.TestCase):
+    """Dedicated trigger/pass tests for check_graph_consistency (Check 2)."""
+
+    def test_missing_graph(self):
+        """None graph -> error."""
+        r = LintResult()
+        check_graph_consistency({'a': {'consumes': []}}, {'a': {}}, None, r)
+        self.assertGreaterEqual(len(r.errors), 1)
+
+    def test_module_not_in_graph(self):
+        """Module has contract but missing from GRAPH -> error."""
+        contracts = {'a': {'consumes': []}}
+        graph = {'modules': {}}
+        r = LintResult()
+        check_graph_consistency(contracts, contracts, graph, r)
+        self.assertGreaterEqual(len(r.errors), 1)
+
+    def test_stale_graph_entry(self):
+        """Module in graph but no contract -> warning."""
+        contracts = {'a': {'consumes': []}}
+        graph = {'modules': {'a': {'consumes': [], 'consumed_by': []}, 'ghost': {'consumes': [], 'consumed_by': []}}}
+        r = LintResult()
+        check_graph_consistency(contracts, contracts, graph, r)
+        self.assertGreaterEqual(len(r.warnings), 1)
+
+    def test_consumes_mismatch(self):
+        """Graph says different consumes than contract -> error."""
+        contracts = {'a': {'consumes': [{'module': 'b'}]}, 'b': {'consumes': []}}
+        graph = {'modules': {'a': {'consumes': [], 'consumed_by': []}, 'b': {'consumes': [], 'consumed_by': []}}}
+        r = LintResult()
+        check_graph_consistency(contracts, contracts, graph, r)
+        self.assertGreaterEqual(len(r.errors), 1)
+
+    def test_consumed_by_inconsistency(self):
+        """consumed_by claims a consumer but consumer doesn't list this module -> error."""
+        graph = {'modules': {
+            'a': {'consumes': [], 'consumed_by': ['b']},
+            'b': {'consumes': [], 'consumed_by': []},
+        }}
+        r = LintResult()
+        check_graph_consistency({'a': {'consumes': []}, 'b': {'consumes': []}},
+                                {'a': {}, 'b': {}}, graph, r)
+        self.assertGreaterEqual(len(r.errors), 1)
+
+
+class TestNamingEdge(unittest.TestCase):
+    """Dedicated trigger/pass tests for check_naming_conventions (Check 3)."""
+
+    def test_bad_module_name_uppercase(self):
+        """Module name with uppercase -> error."""
+        r = LintResult()
+        check_naming_conventions({'MyModule': {'provides': []}}, {}, r)
+        self.assertGreaterEqual(len(r.errors), 1)
+
+    def test_bad_module_name_underscore(self):
+        """Module name with underscore -> error."""
+        r = LintResult()
+        check_naming_conventions({'my_module': {'provides': []}}, {}, r)
+        self.assertGreaterEqual(len(r.errors), 1)
+
+    def test_bad_interface_name(self):
+        """Interface not snake_case -> error."""
+        r = LintResult()
+        check_naming_conventions({'good-mod': {'provides': [{'id': 'CamelCase'}]}}, {}, r)
+        self.assertGreaterEqual(len(r.errors), 1)
+
+    def test_bad_error_code(self):
+        """Error code not SCREAMING_SNAKE_CASE -> error."""
+        r = LintResult()
+        check_naming_conventions({'good-mod': {'provides': [{'id': 'do_thing', 'errors': ['lowercase_err']}]}}, {}, r)
+        self.assertGreaterEqual(len(r.errors), 1)
+
+    def test_all_valid_naming(self):
+        """All names follow conventions -> no errors."""
+        r = LintResult()
+        check_naming_conventions({'good-mod': {'provides': [{'id': 'do_thing', 'errors': ['NOT_FOUND']}]}}, {}, r)
+        self.assertTrue(r.ok())
+
+
+class TestManifestEdge(unittest.TestCase):
+    """Dedicated trigger/pass tests for check_manifest_consistency (Check 6)."""
+
+    def test_contract_not_in_manifest(self):
+        """Module has contract but missing from MANIFEST -> error."""
+        r = LintResult()
+        check_manifest_consistency({'mod-a': {}}, {'modules': {}}, r)
+        self.assertGreaterEqual(len(r.errors), 1)
+
+    def test_stale_manifest_entry(self):
+        """Module in MANIFEST but no contract -> warning."""
+        r = LintResult()
+        check_manifest_consistency({'mod-a': {}}, {'modules': {'mod-a': {}, 'ghost': {}}}, r)
+        self.assertGreaterEqual(len(r.warnings), 1)
+
+    def test_no_manifest(self):
+        """None manifest -> error."""
+        r = LintResult()
+        check_manifest_consistency({'mod-a': {}}, None, r)
+        self.assertGreaterEqual(len(r.errors), 1)
+
+    def test_manifest_modules_not_dict(self):
+        """MANIFEST modules is not a dict -> error."""
+        r = LintResult()
+        check_manifest_consistency({'mod-a': {}}, {'modules': 'not-a-dict'}, r)
+        self.assertGreaterEqual(len(r.errors), 1)
+
+
+class TestStateEdge(unittest.TestCase):
+    """Dedicated trigger/pass tests for check_state_files (Check 7)."""
+
+    def test_missing_state_file(self):
+        """No STATE.yaml -> warning."""
+        with TempProject() as tp:
+            (tp.root / 'modules' / 'tm').mkdir(parents=True)
+            r = LintResult()
+            check_state_files(tp.root, {'tm': {}}, r)
+            self.assertGreaterEqual(len(r.warnings), 1)
+
+    def test_invalid_state_status(self):
+        """STATE.yaml with bad status -> warning."""
+        with TempProject() as tp:
+            tp.add_file('modules/tm/STATE.yaml', 'module: tm\nstatus: purple')
+            r = LintResult()
+            check_state_files(tp.root, {'tm': {}}, r)
+            self.assertGreaterEqual(len(r.warnings), 1)
+
+    def test_missing_state_fields(self):
+        """STATE.yaml without 'module' or 'status' -> error."""
+        with TempProject() as tp:
+            tp.add_file('modules/tm/STATE.yaml', 'updated: 2026-01-01')
+            r = LintResult()
+            check_state_files(tp.root, {'tm': {}}, r)
+            self.assertGreaterEqual(len(r.errors), 1)
+
+    def test_empty_state_file(self):
+        """STATE.yaml exists but empty -> error."""
+        with TempProject() as tp:
+            tp.add_file('modules/tm/STATE.yaml', '')
+            r = LintResult()
+            check_state_files(tp.root, {'tm': {}}, r)
+            self.assertGreaterEqual(len(r.errors), 1)
+
+    def test_valid_state_passes(self):
+        """Correct STATE.yaml -> no errors."""
+        with TempProject() as tp:
+            tp.add_file('modules/tm/STATE.yaml', 'module: tm\nstatus: green')
+            r = LintResult()
+            check_state_files(tp.root, {'tm': {}}, r)
+            self.assertTrue(r.ok())
+
+
+class TestAssumptionsEdge(unittest.TestCase):
+    """Dedicated trigger/pass tests for check_assumptions (Check 14)."""
+
+    def test_missing_assumptions_file(self):
+        """No ASSUMPTIONS.yaml -> warning."""
+        with TempProject() as tp:
+            (tp.root / 'modules' / 'tm').mkdir(parents=True)
+            r = LintResult()
+            check_assumptions(tp.root, {'tm': {}}, r)
+            self.assertGreaterEqual(len(r.warnings), 1)
+
+    def test_empty_assumptions_file(self):
+        """ASSUMPTIONS.yaml exists but empty -> error."""
+        with TempProject() as tp:
+            tp.add_file('modules/tm/ASSUMPTIONS.yaml', '')
+            r = LintResult()
+            check_assumptions(tp.root, {'tm': {}}, r)
+            self.assertGreaterEqual(len(r.errors), 1)
+
+    def test_missing_entry_fields(self):
+        """Entry missing required field (id/category/content) -> error."""
+        with TempProject() as tp:
+            tp.add_file('modules/tm/ASSUMPTIONS.yaml',
+                        'module: tm\nassumptions:\n  - category: data')
+            r = LintResult()
+            check_assumptions(tp.root, {'tm': {}}, r)
+            self.assertGreaterEqual(len(r.errors), 1)
+
+    def test_duplicate_assumption_id(self):
+        """Duplicate assumption IDs -> error."""
+        with TempProject() as tp:
+            tp.add_file('modules/tm/ASSUMPTIONS.yaml',
+                        'module: tm\nassumptions:\n'
+                        '  - id: A1\n    category: data\n    content: "x"\n'
+                        '  - id: A1\n    category: retry\n    content: "y"')
+            r = LintResult()
+            check_assumptions(tp.root, {'tm': {}}, r)
+            self.assertGreaterEqual(len(r.errors), 1)
+
+    def test_long_content_warning(self):
+        """Assumption content > 200 chars -> warning."""
+        with TempProject() as tp:
+            long_content = 'x' * 201
+            tp.add_file('modules/tm/ASSUMPTIONS.yaml',
+                        f'module: tm\nassumptions:\n  - id: A1\n    category: data\n    content: "{long_content}"')
+            r = LintResult()
+            check_assumptions(tp.root, {'tm': {}}, r)
+            self.assertGreaterEqual(len(r.warnings), 1)
+
+    def test_valid_assumptions_passes(self):
+        """Well-formed ASSUMPTIONS.yaml -> no errors."""
+        with TempProject() as tp:
+            tp.add_file('modules/tm/ASSUMPTIONS.yaml',
+                        'module: tm\nassumptions:\n  - id: A1\n    category: data\n    content: "uses PostgreSQL"')
+            r = LintResult()
+            check_assumptions(tp.root, {'tm': {}}, r)
+            self.assertTrue(r.ok())
+
+
+class TestChangelogEdge(unittest.TestCase):
+    """Dedicated trigger/pass tests for check_changelog (Check 15)."""
+
+    def test_missing_changelog(self):
+        """No CHANGELOG.yaml -> warning."""
+        with TempProject() as tp:
+            (tp.root / 'modules' / 'tm').mkdir(parents=True)
+            r = LintResult()
+            check_changelog(tp.root, {'tm': {}}, r)
+            self.assertGreaterEqual(len(r.warnings), 1)
+
+    def test_empty_changelog(self):
+        """CHANGELOG.yaml empty -> error."""
+        with TempProject() as tp:
+            tp.add_file('modules/tm/CHANGELOG.yaml', '')
+            r = LintResult()
+            check_changelog(tp.root, {'tm': {}}, r)
+            self.assertGreaterEqual(len(r.errors), 1)
+
+    def test_missing_changes_field(self):
+        """CHANGELOG.yaml without 'changes' -> error."""
+        with TempProject() as tp:
+            tp.add_file('modules/tm/CHANGELOG.yaml', 'module: tm')
+            r = LintResult()
+            check_changelog(tp.root, {'tm': {}}, r)
+            self.assertGreaterEqual(len(r.errors), 1)
+
+    def test_changes_not_list(self):
+        """CHANGELOG.yaml 'changes' is string not list -> error."""
+        with TempProject() as tp:
+            tp.add_file('modules/tm/CHANGELOG.yaml', 'module: tm\nchanges: "not a list"')
+            r = LintResult()
+            check_changelog(tp.root, {'tm': {}}, r)
+            self.assertGreaterEqual(len(r.errors), 1)
+
+    def test_valid_changelog_passes(self):
+        """Well-formed CHANGELOG.yaml -> no errors."""
+        with TempProject() as tp:
+            tp.add_file('modules/tm/CHANGELOG.yaml', 'module: tm\nchanges: []')
+            r = LintResult()
+            check_changelog(tp.root, {'tm': {}}, r)
+            self.assertTrue(r.ok())
+
+
+class TestManagersEdge(unittest.TestCase):
+    """Dedicated trigger/pass tests for check_managers_orchestrator (Check 19)."""
+
+    def test_scope_references_unknown_module(self):
+        """SCOPE.yaml owns a module that doesn't exist -> error."""
+        with TempProject() as tp:
+            tp.add_file('managers/mgr1/SCOPE.yaml', 'manager: mgr1\nowns: [ghost-mod]')
+            r = LintResult()
+            check_managers_orchestrator(tp.root, {'real-mod': {}}, {'managers': {'mgr1': {'owns': ['ghost-mod']}}}, r)
+            self.assertGreaterEqual(len(r.errors), 1)
+
+    def test_scope_manifest_mismatch(self):
+        """SCOPE.yaml owns list differs from MANIFEST -> error."""
+        with TempProject() as tp:
+            tp.add_file('managers/mgr1/SCOPE.yaml', 'manager: mgr1\nowns: [mod-a, mod-b]')
+            r = LintResult()
+            check_managers_orchestrator(tp.root, {'mod-a': {}, 'mod-b': {}},
+                                        {'managers': {'mgr1': {'owns': ['mod-a']}}}, r)
+            self.assertGreaterEqual(len(r.errors), 1)
+
+    def test_plan_references_nonexistent_module(self):
+        """Orchestrator PLAN.yaml references missing module -> error."""
+        with TempProject() as tp:
+            tp.add_file('orchestrator/PLAN.yaml',
+                        'phases:\n  - name: phase1\n    modules: [ghost-mod]')
+            r = LintResult()
+            check_managers_orchestrator(tp.root, {'real-mod': {}}, {}, r)
+            self.assertGreaterEqual(len(r.errors), 1)
+
+    def test_scope_name_mismatch(self):
+        """SCOPE.yaml manager field doesn't match directory -> error."""
+        with TempProject() as tp:
+            tp.add_file('managers/mgr1/SCOPE.yaml', 'manager: wrong-name\nowns: []')
+            r = LintResult()
+            check_managers_orchestrator(tp.root, {}, {'managers': {}}, r)
+            self.assertGreaterEqual(len(r.errors), 1)
+
+
+class TestVersionPinning(unittest.TestCase):
+    """Dedicated trigger/pass tests for check_version_pinning (Check 21)."""
+
+    def test_missing_pin_warns(self):
+        """consumes without contract_version -> warning."""
+        contracts = {'a': {'consumes': [{'module': 'b', 'interface': 'do_thing'}]}}
+        all_c = {'a': contracts['a'], 'b': {'version': 1, 'provides': [{'id': 'do_thing'}]}}
+        r = LintResult()
+        check_version_pinning(contracts, all_c, r)
+        self.assertGreaterEqual(len(r.warnings), 1)
+
+    def test_correct_pin_passes(self):
+        """Pin matches provider version -> no warnings."""
+        contracts = {'a': {'consumes': [{'module': 'b', 'interface': 'do_thing', 'contract_version': 1}]}}
+        all_c = {'a': contracts['a'], 'b': {'version': 1, 'provides': [{'id': 'do_thing'}]}}
+        r = LintResult()
+        check_version_pinning(contracts, all_c, r)
+        self.assertEqual(len(r.warnings), 0)
+
+    def test_stale_pin_warns(self):
+        """Pin doesn't match provider version -> warning."""
+        contracts = {'a': {'consumes': [{'module': 'b', 'interface': 'do_thing', 'contract_version': 1}]}}
+        all_c = {'a': contracts['a'], 'b': {'version': 2, 'provides': [{'id': 'do_thing'}]}}
+        r = LintResult()
+        check_version_pinning(contracts, all_c, r)
+        self.assertGreaterEqual(len(r.warnings), 1)
+
+    def test_empty_consumes_passes(self):
+        """No consumes -> no warnings."""
+        r = LintResult()
+        check_version_pinning({'a': {'consumes': []}}, {}, r)
+        self.assertEqual(len(r.warnings), 0)
+
+
+class TestStaleRequests(unittest.TestCase):
+    """Dedicated trigger/pass tests for check_stale_requests (Check 22)."""
+
+    def test_stale_open_request(self):
+        """Open request older than 7 days -> warning."""
+        with TempProject() as tp:
+            tp.add_file('BUS/requests/r1.yaml',
+                        'id: R1\nfrom: a\nto: b\nstatus: open\nrequest: help\n'
+                        'created: 2020-01-01T00:00:00Z')
+            r = LintResult()
+            check_stale_requests(tp.root, r)
+            self.assertGreaterEqual(len(r.warnings), 1)
+
+    def test_fresh_request_ok(self):
+        """Open request within 7 days -> no warning."""
+        with TempProject() as tp:
+            tp.add_file('BUS/requests/r1.yaml',
+                        'id: R1\nfrom: a\nto: b\nstatus: open\nrequest: help\n'
+                        'created: 2099-01-01T00:00:00Z')
+            r = LintResult()
+            check_stale_requests(tp.root, r)
+            self.assertEqual(len(r.warnings), 0)
+
+    def test_resolved_not_flagged(self):
+        """Resolved old request -> no warning (only open/acknowledged are checked)."""
+        with TempProject() as tp:
+            tp.add_file('BUS/requests/r1.yaml',
+                        'id: R1\nfrom: a\nto: b\nstatus: resolved\nrequest: help\n'
+                        'created: 2020-01-01T00:00:00Z')
+            r = LintResult()
+            check_stale_requests(tp.root, r)
+            self.assertEqual(len(r.warnings), 0)
+
+    def test_stale_acknowledged_request(self):
+        """Acknowledged request older than 7 days -> warning."""
+        with TempProject() as tp:
+            tp.add_file('BUS/requests/r1.yaml',
+                        'id: R1\nfrom: a\nto: b\nstatus: acknowledged\nrequest: help\n'
+                        'created: 2020-01-01T00:00:00Z')
+            r = LintResult()
+            check_stale_requests(tp.root, r)
+            self.assertGreaterEqual(len(r.warnings), 1)
+
+    def test_no_requests_dir(self):
+        """No BUS/requests directory -> no errors or warnings."""
+        with TempProject() as tp:
+            r = LintResult()
+            check_stale_requests(tp.root, r)
+            self.assertTrue(r.ok())
+            self.assertEqual(len(r.warnings), 0)
+
+
+class TestSchemaValidation(unittest.TestCase):
+    """Dedicated trigger/pass tests for check_schemas (Check 23)."""
+
+    def test_unknown_key_warns(self):
+        """CONTRACT.yaml with unknown key -> warning."""
+        with TempProject() as tp:
+            tp.add_file('modules/tm/CONTRACT.yaml',
+                        'module: tm\nversion: 1\nstatus: draft\npurpose: test\n'
+                        'provides: []\nbogus_key: hello')
+            r = LintResult()
+            check_schemas(tp.root, {'tm': {}}, r)
+            warns = [w for w in r.warnings if 'bogus_key' in w]
+            self.assertGreaterEqual(len(warns), 1)
+
+    def test_wrong_type_warns(self):
+        """CONTRACT.yaml version is string instead of int -> warning."""
+        with TempProject() as tp:
+            tp.add_file('modules/tm/CONTRACT.yaml',
+                        'module: tm\nversion: "one"\nstatus: draft\npurpose: test\nprovides: []')
+            r = LintResult()
+            check_schemas(tp.root, {'tm': {}}, r)
+            warns = [w for w in r.warnings if 'version' in w and 'int' in w]
+            self.assertGreaterEqual(len(warns), 1)
+
+    def test_valid_schema_passes(self):
+        """Well-formed CONTRACT.yaml -> no schema warnings."""
+        with TempProject() as tp:
+            tp.add_file('modules/tm/CONTRACT.yaml',
+                        'module: tm\nversion: 1\nstatus: draft\npurpose: test\nprovides: []')
+            r = LintResult()
+            check_schemas(tp.root, {'tm': {}}, r)
+            schema_warns = [w for w in r.warnings if 'unknown key' in w or 'should be' in w]
+            self.assertEqual(len(schema_warns), 0)
+
+    def test_state_unknown_key_warns(self):
+        """STATE.yaml with unknown key -> warning."""
+        with TempProject() as tp:
+            tp.add_file('modules/tm/STATE.yaml',
+                        'module: tm\nstatus: green\nfoo_bar: baz')
+            r = LintResult()
+            check_schemas(tp.root, {'tm': {}}, r)
+            warns = [w for w in r.warnings if 'foo_bar' in w]
+            self.assertGreaterEqual(len(warns), 1)
+
+    def test_memory_unknown_key_warns(self):
+        """MEMORY.yaml with unknown key -> warning."""
+        with TempProject() as tp:
+            tp.add_file('modules/tm/MEMORY.yaml',
+                        'module: tm\nentries: []\nwhatever: 42')
+            r = LintResult()
+            check_schemas(tp.root, {'tm': {}}, r)
+            warns = [w for w in r.warnings if 'whatever' in w]
+            self.assertGreaterEqual(len(warns), 1)
+
+
+class TestMalformedInput(unittest.TestCase):
+    """Edge case tests for malformed or empty inputs."""
+
+    def test_malformed_yaml_parse(self):
+        """Malformed YAML returns parse error dict."""
+        result = parse_yaml_file('/nonexistent/path/file.yaml')
+        self.assertIsNone(result)
+
+    def test_empty_provides_structure(self):
+        """Contract with provides: [] passes structure check (just warns no invariants)."""
+        r = LintResult()
+        check_contract_structure({'tm': {'module': 'tm', 'version': 1, 'status': 'draft',
+                                          'purpose': 'test', 'provides': []}}, r)
+        self.assertTrue(r.ok())
+
+    def test_consumes_not_list_ignored(self):
+        """consumes as string instead of list -> cross-ref check skips gracefully."""
+        r = LintResult()
+        check_cross_references({'a': {'consumes': 'not-a-list'}}, {'a': {}}, r)
+        self.assertTrue(r.ok())
+
+    def test_provides_entry_not_dict(self):
+        """provides entry that is a string not dict -> error."""
+        r = LintResult()
+        check_contract_structure({'tm': {'module': 'tm', 'version': 1, 'status': 'draft',
+                                          'purpose': 'test', 'provides': ['just-a-string']}}, r)
+        self.assertGreaterEqual(len(r.errors), 1)
+
+    def test_none_conventions_for_naming(self):
+        """None conventions for naming check -> no crash."""
+        r = LintResult()
+        check_naming_conventions({'good-mod': {'provides': [{'id': 'do_thing', 'errors': ['ERR']}]}}, None, r)
+        self.assertTrue(r.ok())
+
+    def test_none_conventions_for_granularity(self):
+        """None conventions for granularity -> uses defaults, no crash."""
+        r = LintResult()
+        check_granularity({'m': {'provides': [{'id': f'f{i}'} for i in range(5)], 'status': 'stable'}}, None, r)
+        self.assertTrue(r.ok())
+
+    def test_none_conventions_for_memory(self):
+        """None conventions for memory check -> uses defaults, no crash."""
+        with TempProject() as tp:
+            tp.add_file('modules/tm/MEMORY.yaml', 'module: tm\nentries: []')
+            r = LintResult()
+            check_memory_files(tp.root, {'tm': {}}, None, r)
+            self.assertTrue(r.ok())
+
+
+class TestContractStructureExtra(unittest.TestCase):
+    """Additional edge cases for check_contract_structure (Check 5)."""
+
+    def test_invalid_status_warns(self):
+        """Unknown status value -> warning."""
+        r = LintResult()
+        check_contract_structure({'m': {'module': 'm', 'version': 1, 'status': 'banana',
+                                        'purpose': 'test', 'provides': []}}, r)
+        self.assertGreaterEqual(len(r.warnings), 1)
+
+    def test_module_name_mismatch(self):
+        """module field doesn't match directory name -> error."""
+        r = LintResult()
+        check_contract_structure({'dir-name': {'module': 'wrong-name', 'version': 1,
+                                                'status': 'draft', 'purpose': 'test',
+                                                'provides': []}}, r)
+        self.assertGreaterEqual(len(r.errors), 1)
+
+    def test_duplicate_interface_id(self):
+        """Two interfaces with same id -> error."""
+        r = LintResult()
+        check_contract_structure({'m': {'module': 'm', 'version': 1, 'status': 'draft',
+                                        'purpose': 'test',
+                                        'provides': [
+                                            {'id': 'do_thing', 'input': {}, 'output': {}},
+                                            {'id': 'do_thing', 'input': {}, 'output': {}},
+                                        ]}}, r)
+        errs = [e for e in r.errors if 'Duplicate' in e]
+        self.assertGreaterEqual(len(errs), 1)
+
+    def test_missing_interface_field(self):
+        """Interface missing 'input' -> error."""
+        r = LintResult()
+        check_contract_structure({'m': {'module': 'm', 'version': 1, 'status': 'draft',
+                                        'purpose': 'test',
+                                        'provides': [{'id': 'func', 'output': {}}]}}, r)
+        errs = [e for e in r.errors if 'input' in e]
+        self.assertGreaterEqual(len(errs), 1)
+
+
+class TestDomainModuleChecks(unittest.TestCase):
+    """Verify per-module checks work with domain layout (domains/<domain>/<module>)."""
+
+    def test_state_check_finds_domain_module(self):
+        """check_state_files works for modules under domains/."""
+        with TempProject() as tp:
+            tp.add_domain_module('backend', 'api', 'module: api')
+            tp.add_file('domains/backend/api/STATE.yaml', 'module: api\nstatus: green')
+            from discover import discover_modules
+            paths = discover_modules(tp.root)
+            r = LintResult()
+            check_state_files(tp.root, {'api': {}}, r, module_paths=paths)
+            self.assertTrue(r.ok())
+
+    def test_memory_check_finds_domain_module(self):
+        """check_memory_files works for modules under domains/."""
+        with TempProject() as tp:
+            tp.add_domain_module('backend', 'api', 'module: api')
+            tp.add_file('domains/backend/api/MEMORY.yaml', 'module: api\nentries: []')
+            from discover import discover_modules
+            paths = discover_modules(tp.root)
+            r = LintResult()
+            check_memory_files(tp.root, {'api': {}}, {}, r, module_paths=paths)
+            self.assertTrue(r.ok())
+
+    def test_tests_check_finds_domain_module(self):
+        """check_test_files works for modules under domains/."""
+        with TempProject() as tp:
+            tp.add_domain_module('backend', 'api', 'module: api')
+            tp.add_file('domains/backend/api/TESTS.yaml',
+                        'module: api\ntests:\n  - interface: do_thing\n    case: basic\n    expect: {}')
+            from discover import discover_modules
+            paths = discover_modules(tp.root)
+            r = LintResult()
+            check_test_files(tp.root, {'api': {'provides': [{'id': 'do_thing'}]}}, r, module_paths=paths)
+            self.assertTrue(r.ok())
+
+    def test_assumptions_check_finds_domain_module(self):
+        """check_assumptions works for modules under domains/."""
+        with TempProject() as tp:
+            tp.add_domain_module('backend', 'api', 'module: api')
+            tp.add_file('domains/backend/api/ASSUMPTIONS.yaml',
+                        'module: api\nassumptions:\n  - id: A1\n    category: data\n    content: "uses postgres"')
+            from discover import discover_modules
+            paths = discover_modules(tp.root)
+            r = LintResult()
+            check_assumptions(tp.root, {'api': {}}, r, module_paths=paths)
+            self.assertTrue(r.ok())
+
+    def test_changelog_check_finds_domain_module(self):
+        """check_changelog works for modules under domains/."""
+        with TempProject() as tp:
+            tp.add_domain_module('backend', 'api', 'module: api')
+            tp.add_file('domains/backend/api/CHANGELOG.yaml', 'module: api\nchanges: []')
+            from discover import discover_modules
+            paths = discover_modules(tp.root)
+            r = LintResult()
+            check_changelog(tp.root, {'api': {}}, r, module_paths=paths)
+            self.assertTrue(r.ok())
+
+    def test_replacement_check_finds_domain_module(self):
+        """check_replacement_ready works for modules under domains/."""
+        with TempProject() as tp:
+            tp.add_domain_module('backend', 'api', 'module: api')
+            for f in ['CONTRACT.yaml', 'STATE.yaml', 'MEMORY.yaml',
+                       'CHANGELOG.yaml', 'TESTS.yaml', 'ASSUMPTIONS.yaml']:
+                tp.add_file(f'domains/backend/api/{f}', 'module: api')
+            from discover import discover_modules
+            paths = discover_modules(tp.root)
+            r = LintResult()
+            check_replacement_ready(tp.root, {'api': {'status': 'stable'}}, r, module_paths=paths)
+            self.assertEqual(len(r.warnings), 0)
+
+
+class TestBusEdgeCases(unittest.TestCase):
+    """Edge cases for BUS validation (Check 17)."""
+
+    def test_invalid_delta_type(self):
+        """Delta with unknown type -> error."""
+        with TempProject() as tp:
+            tp.add_file('BUS/deltas/d.yaml',
+                        'source: mod-a\ntimestamp: 2026-01-01T00:00:00Z\ntype: unknown_type')
+            tp.add_file('BUS/requests/.gitkeep', '')
+            r = LintResult()
+            check_bus(tp.root, {'mod-a': {}}, r)
+            self.assertGreaterEqual(len(r.errors), 1)
+
+    def test_request_missing_required_fields(self):
+        """Request missing required fields -> errors."""
+        with TempProject() as tp:
+            tp.add_file('BUS/deltas/.gitkeep', '')
+            tp.add_file('BUS/requests/r1.yaml', 'id: R1')
+            r = LintResult()
+            check_bus(tp.root, {}, r)
+            self.assertGreaterEqual(len(r.errors), 1)
+
+    def test_invalid_request_status(self):
+        """Request with unknown status -> error."""
+        with TempProject() as tp:
+            tp.add_file('BUS/deltas/.gitkeep', '')
+            tp.add_file('BUS/requests/r1.yaml',
+                        'id: R1\nfrom: a\nto: b\nstatus: magic\nrequest: stuff')
+            r = LintResult()
+            check_bus(tp.root, {'a': {}, 'b': {}}, r)
+            self.assertGreaterEqual(len(r.errors), 1)
+
+    def test_no_bus_dir_passes(self):
+        """No BUS directory at all -> no errors."""
+        with TempProject() as tp:
+            r = LintResult()
+            check_bus(tp.root, {'mod-a': {}}, r)
+            self.assertTrue(r.ok())
+
+
+class TestMemoryEdgeCases(unittest.TestCase):
+    """Additional edge cases for check_memory_files (Check 8)."""
+
+    def test_entry_not_dict(self):
+        """MEMORY.yaml entry is string not dict -> error."""
+        with TempProject() as tp:
+            tp.add_file('modules/tm/MEMORY.yaml',
+                        'module: tm\nentries:\n  - "just a string"')
+            r = LintResult()
+            check_memory_files(tp.root, {'tm': {}},
+                               {'memory': {'max_entries': 20, 'max_content_chars': 100,
+                                           'valid_types': ['decision']}}, r)
+            self.assertGreaterEqual(len(r.errors), 1)
+
+    def test_invalid_entry_type(self):
+        """MEMORY.yaml entry with unknown type -> warning."""
+        with TempProject() as tp:
+            tp.add_file('modules/tm/MEMORY.yaml',
+                        'module: tm\nentries:\n  - type: banana\n    content: "ok"')
+            r = LintResult()
+            check_memory_files(tp.root, {'tm': {}},
+                               {'memory': {'max_entries': 20, 'max_content_chars': 100,
+                                           'valid_types': ['decision']}}, r)
+            self.assertGreaterEqual(len(r.warnings), 1)
+
+    def test_content_too_long(self):
+        """MEMORY.yaml entry content > max_content_chars -> warning."""
+        with TempProject() as tp:
+            long_content = 'x' * 101
+            tp.add_file('modules/tm/MEMORY.yaml',
+                        f'module: tm\nentries:\n  - type: decision\n    content: "{long_content}"')
+            r = LintResult()
+            check_memory_files(tp.root, {'tm': {}},
+                               {'memory': {'max_entries': 20, 'max_content_chars': 100,
+                                           'valid_types': ['decision']}}, r)
+            self.assertGreaterEqual(len(r.warnings), 1)
+
+    def test_module_name_mismatch(self):
+        """MEMORY.yaml module field doesn't match dir -> error."""
+        with TempProject() as tp:
+            tp.add_file('modules/tm/MEMORY.yaml', 'module: wrong-name\nentries: []')
+            r = LintResult()
+            check_memory_files(tp.root, {'tm': {}}, {}, r)
+            self.assertGreaterEqual(len(r.errors), 1)
 
 
 if __name__ == '__main__':
