@@ -247,10 +247,66 @@ def generate_deltas(module, old_contract, new_contract, root):
             'summary': f"Modified {mod_info['id']} ({changed_fields})",
         })
 
+    for dep in cons_added:
+        dep_mod = dep.get('module', '?') if isinstance(dep, dict) else str(dep)
+        dep_iface = dep.get('interface', '?') if isinstance(dep, dict) else '?'
+        delta = {
+            'filename': f"{now_file}_{module}.yaml",
+            'content': (
+                f"source: {module}\n"
+                f"contract_version: {old_version} -> {new_version}\n"
+                f"timestamp: {now}\n"
+                f"type: dependency_added\n"
+                f"\n"
+                f"change:\n"
+                f"  added_dependency:\n"
+                f"    module: {dep_mod}\n"
+                f"    interface: {dep_iface}\n"
+                f"\n"
+                f"impact:\n"
+                f"  consumers_affected: [{', '.join(consumers)}]\n"
+                f"  action_required: acknowledge\n"
+            ),
+        }
+        deltas.append(delta)
+        changelog_entries.append({
+            'type': 'dependency_added',
+            'summary': f"Added dependency on {dep_mod}.{dep_iface}",
+        })
+
+    for dep in cons_removed:
+        dep_mod = dep.get('module', '?') if isinstance(dep, dict) else str(dep)
+        dep_iface = dep.get('interface', '?') if isinstance(dep, dict) else '?'
+        delta = {
+            'filename': f"{now_file}_{module}.yaml",
+            'content': (
+                f"source: {module}\n"
+                f"contract_version: {old_version} -> {new_version}\n"
+                f"timestamp: {now}\n"
+                f"type: dependency_removed\n"
+                f"\n"
+                f"change:\n"
+                f"  removed_dependency:\n"
+                f"    module: {dep_mod}\n"
+                f"    interface: {dep_iface}\n"
+                f"\n"
+                f"impact:\n"
+                f"  consumers_affected: [{', '.join(consumers)}]\n"
+                f"  action_required: acknowledge\n"
+            ),
+        }
+        deltas.append(delta)
+        changelog_entries.append({
+            'type': 'dependency_removed',
+            'summary': f"Removed dependency on {dep_mod}.{dep_iface}",
+        })
+
     summary = {
         'added': len(added),
         'removed': len(removed),
         'modified': len(modified),
+        'deps_added': len(cons_added),
+        'deps_removed': len(cons_removed),
         'consumers_affected': consumers,
         'deltas': deltas,
         'changelog_entries': changelog_entries,

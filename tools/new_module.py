@@ -15,6 +15,7 @@ Zero external dependencies — uses the same YAML parser as lint_contracts.py.
 import argparse
 import os
 import re
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -282,7 +283,8 @@ def main():
 
     if args.lint:
         print()
-        os.system(f'cd {root} && python3 lint_contracts.py')
+        subprocess.run([sys.executable, str(Path(__file__).parent / 'lint_contracts.py')],
+                       cwd=str(root))
 
 
 if __name__ == '__main__':

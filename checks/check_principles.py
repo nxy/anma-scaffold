@@ -96,7 +96,7 @@ def check_p2_tokens_are_bottleneck(root, contracts, result, conventions=None, mo
     """P2: Single contract within token_thresholds.contract_max."""
     max_tokens = 500  # fallback
     if conventions:
-        max_tokens = conventions.get("token_thresholds", {}).get("contract_max", max_tokens)
+        max_tokens = (conventions.get("token_thresholds") or {}).get("contract_max", max_tokens)
     if module_paths is None:
         module_paths = {}
     print("── Principle 2: Tokens are the bottleneck ──")
@@ -213,7 +213,7 @@ def check_p6_recovery_is_cheap(root, contracts, result, conventions=None, module
     """P6: Module recovery (CONTRACT+STATE+MEMORY) within token_thresholds.recovery_max."""
     max_tokens = 800  # fallback
     if conventions:
-        max_tokens = conventions.get("token_thresholds", {}).get("recovery_max", max_tokens)
+        max_tokens = (conventions.get("token_thresholds") or {}).get("recovery_max", max_tokens)
     if module_paths is None:
         module_paths = {}
     print("── Principle 6: Recovery is cheap ──")

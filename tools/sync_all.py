@@ -125,6 +125,8 @@ def sync_all(root, regenerate_only=False, force=False):
     print(f"Found {len(module_names)} module(s): {', '.join(module_names)}")
     print()
 
+    freshly_stubbed_tests = set()
+
     if not regenerate_only:
         # Step 1: Ensure all 6 required files exist
         for mod_name in module_names:
@@ -135,6 +137,8 @@ def sync_all(root, regenerate_only=False, force=False):
                     ensure_stub(filepath, mod_name)
                     created.append(f"{mod_name}/{req_file}")
                     print(f"  Created {mod_name}/{req_file}")
+                    if req_file == 'TESTS.yaml':
+                        freshly_stubbed_tests.add(mod_name)
             # Ensure BUS subdirectories
             for bus_sub in ['requests', 'deltas']:
                 bus_dir = mod_dir / 'BUS' / bus_sub
@@ -166,7 +170,8 @@ def sync_all(root, regenerate_only=False, force=False):
 
             if (not force and not tool_changed
                     and stored_contracts.get(mod_name) == current_hash
-                    and (mod_dir / 'TESTS.yaml').exists()):
+                    and (mod_dir / 'TESTS.yaml').exists()
+                    and mod_name not in freshly_stubbed_tests):
                 print(f"  Skipped {mod_name}/TESTS.yaml (unchanged)")
                 continue
 
@@ -259,6 +264,8 @@ def sync_all(root, regenerate_only=False, force=False):
             for mgr_name, mgr_data in sorted(managers.items()):
                 if isinstance(mgr_data, dict):
                     owns = mgr_data.get('owns', [])
+                elif isinstance(mgr_data, list):
+                    owns = mgr_data
                 else:
                     owns = []
                 # Filter to only modules that still exist

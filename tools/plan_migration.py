@@ -87,11 +87,6 @@ def build_migration_plan(root, module_name, target_version):
                     consumer['pinned_version'] = entry.get('contract_version')
                     consumer['interface'] = str(entry.get('interface', '?'))
                     break
-                # Also check transitive path
-                if isinstance(entry, dict) and str(entry.get('module', '')) == consumer.get('via', ''):
-                    consumer['pinned_version'] = entry.get('contract_version')
-                    consumer['interface'] = str(entry.get('interface', '?'))
-                    break
 
     # Compute update order
     ordered = compute_update_order(consumers)

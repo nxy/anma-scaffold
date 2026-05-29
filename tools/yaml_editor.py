@@ -300,10 +300,20 @@ def scope_add_module(root, manager, module_name):
     # Rewrite owns line in-place (preserving rest of file)
     new_owns_str = ', '.join(str(o) for o in owns)
     lines = content.split('\n')
+    found = False
     for i, line in enumerate(lines):
         if line.startswith('owns:'):
             lines[i] = f"owns: [{new_owns_str}]"
+            found = True
             break
+    if not found:
+        for i, line in enumerate(lines):
+            if line.startswith('manager:'):
+                lines.insert(i + 1, f"owns: [{new_owns_str}]")
+                found = True
+                break
+    if not found:
+        lines.append(f"owns: [{new_owns_str}]")
     path.write_text('\n'.join(lines))
     return True
 

@@ -36,7 +36,7 @@ def main():
     for fp in files:
         if fp.exists():
             c = fp.read_text()
-            nc = c.replace(old_name, new_name)
+            nc = re.sub(r'(?<![a-z0-9-])' + re.escape(old_name) + r'(?![a-z0-9-])', new_name, c)
             if nc != c: fp.write_text(nc); print(f"  Updated {fp.relative_to(root)}"); updated += 1
     print(f"\n  Renamed in {updated} file(s). Run 'python3 gen_claude_md.py' to regenerate CLAUDE.md.\n")
 

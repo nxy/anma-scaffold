@@ -168,6 +168,7 @@ def generate_module_claude_md(root, module_name):
 
     purpose = contract.get('purpose', 'TBD')
     status = contract.get('status', 'unknown')
+    rel_path = mod_dir.relative_to(root)
 
     lines = [
         f"# CLAUDE.md — {module_name} Agent Instructions",
@@ -183,9 +184,9 @@ def generate_module_claude_md(root, module_name):
         "1. `CONVENTIONS.yaml`",
         "2. `MANIFEST.yaml`",
         f"3. `GRAPH.yaml` (your edges: consumes {consumes}, consumed_by {consumed_by})",
-        f"4. `modules/{module_name}/CONTRACT.yaml` — YOUR contract (source of truth)",
-        f"5. `modules/{module_name}/STATE.yaml` — update after every task",
-        f"6. `modules/{module_name}/MEMORY.yaml` — curate, don't just append",
+        f"4. `{rel_path}/CONTRACT.yaml` — YOUR contract (source of truth)",
+        f"5. `{rel_path}/STATE.yaml` — update after every task",
+        f"6. `{rel_path}/MEMORY.yaml` — curate, don't just append",
         "",
         "## Your Interfaces",
         "",

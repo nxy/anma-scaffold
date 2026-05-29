@@ -189,7 +189,7 @@ def main():
     root = Path(args.path).resolve()
     tests = generate_tests(root, args.module)
 
-    # Append mode: filter out tests for already-covered interfaces
+    # Append mode: filter out tests for already-covered interfaces, merge with existing
     if args.append:
         existing_path = _module_dir(root, args.module) / 'TESTS.yaml'
         if existing_path.exists():
@@ -199,10 +199,11 @@ def main():
                 for t in existing['tests']:
                     if isinstance(t, dict) and 'interface' in t:
                         covered.add(t['interface'])
-                tests = [t for t in tests if t['interface'] not in covered]
-                if not tests:
+                new_tests = [t for t in tests if t['interface'] not in covered]
+                if not new_tests:
                     print("All interfaces already have tests.", file=sys.stderr)
                     sys.exit(0)
+                tests = existing['tests'] + new_tests
 
     content = format_tests_yaml(args.module, tests)
 

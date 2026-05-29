@@ -141,7 +141,7 @@ def main():
         [sys.executable, str(TOOLS_DIR / "sync_all.py"), "--path", str(root)],
         capture_output=True, text=True)
     if result.returncode != 0:
-        print(f"  sync_all.py failed:\n{result.stdout[-500:]}")
+        print(f"  sync_all.py failed:\n{(result.stderr or result.stdout)[-500:]}")
         sys.exit(1)
     print("  ✓ sync complete")
 

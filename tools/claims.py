@@ -49,7 +49,7 @@ def _save_claims(root, claims):
             by = info.get('by', 'unknown')
             branch = info.get('branch', 'unknown')
             since = info.get('since', '')
-            lines.append(f'  {mod}: {{ by: {by}, branch: {branch}, since: "{since}" }}\n')
+            lines.append(f'  {mod}: {{ by: "{by}", branch: "{branch}", since: "{since}" }}\n')
     path.write_text(''.join(lines))
 
 

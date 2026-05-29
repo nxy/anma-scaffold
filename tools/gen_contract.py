@@ -189,12 +189,13 @@ def generate_contract(name, purpose, consumes, mod_type, root=None, force_patter
     else:
         pattern_name, pattern = detect_pattern(name, purpose)
 
+    escaped_purpose = purpose.replace('\\', '\\\\').replace('"', '\\"')
     lines = [
         f"module: {name}",
         "version: 1",
         "status: draft",
         f"type: {mod_type}",
-        f'purpose: "{purpose}"',
+        f'purpose: "{escaped_purpose}"',
         "",
         "provides:",
     ]

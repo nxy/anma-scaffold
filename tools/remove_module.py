@@ -5,7 +5,7 @@ Usage: python3 remove_module.py auth-service --confirm [--force]
 import argparse, os, shutil, sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
-from lint_contracts import load_all_contracts
+from lint_contracts import load_all_contracts, parse_yaml_file
 from discover import discover_modules
 
 def find_project_root(start='.'):
@@ -34,7 +34,21 @@ def clean_bus(root, name):
             d = bus_dir / sub
             if d.is_dir():
                 for f in d.iterdir():
-                    if f.suffix in ('.yaml', '.yml') and f.name != '.gitkeep' and name in f.read_text():
+                    if f.suffix not in ('.yaml', '.yml') or f.name == '.gitkeep':
+                        continue
+                    data = parse_yaml_file(str(f))
+                    if not data or not isinstance(data, dict):
+                        continue
+                    refs = set()
+                    for key in ['source', 'from', 'to']:
+                        val = data.get(key)
+                        if val and isinstance(val, str):
+                            refs.add(val)
+                    affected = data.get('impact', {})
+                    if isinstance(affected, dict):
+                        for consumer in affected.get('consumers_affected', []):
+                            refs.add(str(consumer))
+                    if name in refs:
                         f.unlink(); removed += 1
     return removed
 

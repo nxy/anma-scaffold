@@ -9,8 +9,8 @@ def run(root, contracts, all_contracts, conventions, manifest, result, **kwargs)
         result.warning('conventions_pin', 'CONVENTIONS.yaml missing conventions_version')
         return
 
-    for mod_name in sorted(all_contracts):
-        contract = all_contracts[mod_name]
+    for mod_name in sorted(contracts):
+        contract = contracts[mod_name]
         pinned = contract.get('conventions_version')
         if pinned is None:
             result.warning(mod_name,

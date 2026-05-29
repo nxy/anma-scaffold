@@ -44,7 +44,17 @@ def load_module_tests(root, module_name):
         sys.exit(1)
 
     tests = parse_yaml_file(str(tests_file))
+    if not tests or not isinstance(tests, dict) or '_parse_error' in tests:
+        print(f"ERROR: Could not parse TESTS.yaml for '{module_name}'")
+        if isinstance(tests, dict) and '_parse_error' in tests:
+            print(f"  {tests['_parse_error']}")
+        sys.exit(1)
     contract = parse_yaml_file(str(contract_file))
+    if not contract or not isinstance(contract, dict) or '_parse_error' in contract:
+        print(f"ERROR: Could not parse CONTRACT.yaml for '{module_name}'")
+        if isinstance(contract, dict) and '_parse_error' in contract:
+            print(f"  {contract['_parse_error']}")
+        sys.exit(1)
     return tests, contract
 
 
