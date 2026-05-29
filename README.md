@@ -105,7 +105,7 @@ Use **Claude + ANMA** when your project has multiple modules that depend on each
 | **Integration bugs** | Often found at runtime | Caught earlier by linted contracts |
 | **Token usage at scale** | Thousands of tokens per module | Hundreds of tokens per module |
 
-ANMA is best for projects that have enough moving parts to need architectural memory — roughly **5–200+ modules** and **1–10 developers**. For tiny scripts or one-off prototypes, it is probably more structure than you need.
+ANMA is best for projects with enough moving parts to need architectural memory — roughly **5+ modules**, multiple interacting features, or a team that expects to use AI agents beyond the first implementation pass. For tiny scripts or one-off prototypes, it is probably more structure than you need.
 
 ---
 
@@ -206,34 +206,22 @@ Continue where we left off.
 
 Claude can recover from `STATE.yaml`, `MEMORY.yaml`, and the existing contracts instead of needing you to re-explain the project from scratch.
 
-### Parallel Development with Dynamic Workflows
+### Parallel AI Work
 
-ANMA contracts define independent modules with explicit boundaries — the exact partition that Claude Code's dynamic workflows need to spawn parallel subagents.
+ANMA also fits naturally with Claude Code's dynamic workflows. Because each module has its own contract, state, and assumptions, Claude can split larger builds into module-sized implementation tasks instead of forcing one long sequential pass.
 
-Instead of implementing 8 modules sequentially (40 minutes), tell Claude to parallelize:
+For larger projects, you can ask Claude Code to design the contracts first, then parallelize implementation across subagents:
 
 ```text
 Read CLAUDE.md and CONVENTIONS.yaml. I want to build [description].
+
 Design the contracts first. Then create a dynamic workflow where each
 subagent implements one module from its contract. Each subagent should
 read CLAUDE.md and CONVENTIONS.yaml plus its assigned contract. After
 all modules are implemented, run the linter and verify everything integrates.
 ```
 
-Each subagent reads one contract (~500 tokens) instead of the full conversation history (~60,000 tokens by turn 20). The result: 93% fewer input tokens and 76% lower API cost compared to sequential single-agent development.
-
-For multiple developers running parallel agents on the same repo, claim modules before starting to prevent conflicts:
-
-```bash
-git config core.hooksPath .githooks
-anma claim user-auth payments         # your scope
-# launch agents
-anma release user-auth payments       # when done
-```
-
-After all agents finish, derived files regenerate automatically on merge.
-
-Run `python3 tools/lint_contracts.py --strict` to verify nothing broke.
+For most projects, keep this simple: use dynamic workflows when the project has multiple independent modules, and always run the ANMA linter before merging changes.
 
 ---
 
