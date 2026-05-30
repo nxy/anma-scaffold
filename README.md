@@ -109,44 +109,52 @@ ANMA is best for projects with enough moving parts to need architectural memory 
 
 ---
 
+## For Engineers Already Using Claude Code
+
+If you're already shipping with Claude Code, you've hit these problems:
+
+**"Read the codebase first"** — Every new session starts with Claude re-reading your entire project. At 50+ files, that's thousands of tokens before any work begins. ANMA contracts give Claude the full architecture in ~500 tokens per module.
+
+**"It broke my other module"** — Claude adds a feature to one module and silently breaks another's interface. ANMA's linter catches undeclared dependencies, missing error codes, and gateway violations before implementation starts.
+
+**"I can't run agents in parallel"** — Two Claude Code instances editing the same project cause merge conflicts and duplicate work. ANMA's claims system coordinates ownership, domain gateways prevent cross-boundary violations, and derived files regenerate automatically on merge.
+
+**"The architecture is in my head"** — You know which modules depend on which, but Claude doesn't. Every session you re-explain the same constraints. ANMA contracts externalize those decisions into machine-readable files that every agent reads automatically.
+
+---
+
+## Retrofitting an Existing Project
+
+You don't need to start from scratch. Point Claude Code at your existing project:
+
+```bash
+cd your-existing-project
+claude --permission-mode auto
+```
+
+```text
+Clone https://github.com/anma-labs/anma-scaffold to a temp directory.
+Copy its tools/, checks/, CONVENTIONS.yaml, and CLAUDE.md into this project
+without overwriting any existing files. Then analyze my codebase and create
+ANMA contracts for each module you find. Match the contracts to the actual
+interfaces, dependencies, and error types in the code. Organize modules
+into domains. Run the linter to verify 0 errors.
+```
+
+Claude reads your source, creates contracts that match your existing architecture, and sets up the tooling. From this point on, every future session reads contracts first instead of re-inferring your architecture from source files.
+
+---
+
 ## Quickstart
 
 Choose the workflow that matches how much control you want.
 
 | Path | Best for | Summary |
 |---|---|---|
-| **Path 1: Conversational** | Founders, product builders, and non-specialists | Claude designs and implements the project with you in one conversation. |
-| **Path 2: Terminal** | Developers who want local control | You manage the repo and use Claude Code to implement from contracts. |
+| **Path 1: Terminal** | Engineers using Claude Code | You manage the repo and use Claude Code to implement from contracts. |
+| **Path 2: Conversational** | Quick prototyping | Claude designs and implements the project in one conversation. |
 
-### Path 1: Conversational Workflow
-
-Open [Claude](https://claude.ai) with Claude Opus 4.6+. Upload any product specs, design docs, wireframes, research files, or reference material, then start with:
-
-```text
-Clone https://github.com/anma-labs/anma-scaffold and read CLAUDE.md and CONVENTIONS.yaml.
-Let me know when you're ready to build a project with me.
-```
-
-Claude reads the architecture rules and becomes your contract architect. Then describe what you want to build:
-
-```text
-I want to build a URL shortener. Users create API keys, shorten URLs with
-custom slugs, track clicks with analytics, and use rate limiting.
-```
-
-Claude identifies module boundaries, drafts contracts, defines interfaces, declares errors, and captures invariants. When the contracts look right, continue with:
-
-```text
-Set up the project and implement all modules.
-```
-
-When implementation is complete:
-
-```text
-Create app.py that wires all modules together.
-```
-
-### Path 2: Terminal Workflow
+### Path 1: Terminal Workflow
 
 Clone the scaffold and install the only dependency:
 
@@ -182,6 +190,34 @@ python3 tools/import_contracts.py revised-CONTRACT.yaml --force
 ```
 
 Contract gaps are not failures. They are ANMA catching integration problems before they become silent runtime bugs.
+
+### Path 2: Conversational Workflow
+
+Open [Claude](https://claude.ai) with Claude Opus 4.6+. Upload any product specs, design docs, wireframes, research files, or reference material, then start with:
+
+```text
+Clone https://github.com/anma-labs/anma-scaffold and read CLAUDE.md and CONVENTIONS.yaml.
+Let me know when you're ready to build a project with me.
+```
+
+Claude reads the architecture rules and becomes your contract architect. Then describe what you want to build:
+
+```text
+I want to build a URL shortener. Users create API keys, shorten URLs with
+custom slugs, track clicks with analytics, and use rate limiting.
+```
+
+Claude identifies module boundaries, drafts contracts, defines interfaces, declares errors, and captures invariants. When the contracts look right, continue with:
+
+```text
+Set up the project and implement all modules.
+```
+
+When implementation is complete:
+
+```text
+Create app.py that wires all modules together.
+```
 
 ---
 
@@ -420,7 +456,7 @@ No. ANMA is a convention plus a set of scripts. It does not replace your web fra
 
 ### What is ANMA probably overkill for?
 
-One-off scripts, tiny prototypes, projects with only a few files, and teams that do not plan to use AI agents during design or implementation.
+Single-file scripts, throwaway prototypes, and projects where you don't use AI agents for implementation. If you write all the code yourself and never plan to use Claude Code or similar tools, ANMA's contracts add overhead without payoff.
 
 ---
 
