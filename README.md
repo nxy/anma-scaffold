@@ -358,10 +358,3 @@ No other dependencies are required.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
 
----
-
-## License
-
-[BSL 1.1](LICENSE) — free to use for any project. You cannot use it to build a competing scaffold product.
-
-The license converts to Apache 2.0 on May 23, 2029.
