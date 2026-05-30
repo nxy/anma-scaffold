@@ -135,10 +135,13 @@ claude --permission-mode auto
 ```text
 Clone https://github.com/anma-labs/anma-scaffold to a temp directory.
 Copy its tools/, checks/, CONVENTIONS.yaml, and CLAUDE.md into this project
-without overwriting any existing files. Then analyze my codebase and create
-ANMA contracts for each module you find. Match the contracts to the actual
-interfaces, dependencies, and error types in the code. Organize modules
-into domains. Run the linter to verify 0 errors.
+without overwriting any existing files. Run python3 tools/init_project.py
+to create the project structure (BUS/, orchestrator/, MANIFEST.yaml,
+GRAPH.yaml). Then analyze my codebase and create ANMA contracts for each
+module you find using python3 tools/new_module.py with --domain. Create
+GATEWAY.yaml for each domain. Match the contracts to the actual interfaces,
+dependencies, and error types in the code. Run python3 tools/sync_all.py
+then python3 tools/lint_contracts.py to verify 0 errors.
 ```
 
 Claude reads your source, creates contracts that match your existing architecture, and sets up the tooling. From this point on, every future session reads contracts first instead of re-inferring your architecture from source files.
