@@ -34,6 +34,7 @@ def count_tokens(text):
 
 
 def pad_memory_to_target(contract_yaml, state_yaml, memory_yaml, target_tokens):
+    """Expand MEMORY.yaml entries until the combined payload reaches target_tokens."""
     current = count_tokens(contract_yaml + state_yaml + memory_yaml)
 
     if current >= target_tokens:
@@ -228,6 +229,7 @@ def score_response(response_text, contract_yaml):
 # ── Claude Code CLI ──────────────────────────────────────────────────────
 
 def run_claude_code(prompt, max_turns=1, timeout=120):
+    """Invoke claude CLI in print mode and return the text output."""
     cmd = ["claude", "-p", "--max-turns", str(max_turns), "--output-format", "text"]
     try:
         result = subprocess.run(
@@ -244,6 +246,7 @@ def run_claude_code(prompt, max_turns=1, timeout=120):
 
 
 def check_claude_available():
+    """Return True if the claude CLI is installed and callable."""
     try:
         r = subprocess.run(["claude", "--version"], capture_output=True, text=True, timeout=10)
         return r.returncode == 0
@@ -254,6 +257,7 @@ def check_claude_available():
 # ── Module selection ──────────────────────────────────────────────────────
 
 def select_test_modules(projects_dir, count=6):
+    """Pick diverse modules from benchmark projects for degradation testing."""
     candidates = []
     for pd in sorted(projects_dir.iterdir()):
         if not pd.is_dir() or pd.name.startswith("."):
@@ -287,6 +291,7 @@ def select_test_modules(projects_dir, count=6):
 # ── Eval runner ───────────────────────────────────────────────────────────
 
 def run_eval(contract, state, memory, target_tokens, trial):
+    """Run one degradation trial at target_tokens and score the response."""
     padded = pad_memory_to_target(contract, state, memory, target_tokens)
     actual = count_tokens(contract + state + padded)
     prompt = EVAL_TASK.format(contract=contract, state=state, memory=padded)

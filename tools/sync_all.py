@@ -66,6 +66,7 @@ def _save_sync_state(root, tool_hash, contract_hashes):
 
 
 def timestamp_now():
+    """Return current UTC time as ISO 8601 string."""
     return datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 
 
@@ -106,6 +107,7 @@ def ensure_stub(filepath, module_name):
 
 
 def sync_all(root, regenerate_only=False, force=False):
+    """Regenerate tests, graph, manifest stubs and keep all module files in sync."""
     root = Path(root).resolve()
     created = []
     updated = []

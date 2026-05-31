@@ -11,6 +11,7 @@ from pathlib import Path
 
 
 def analyze(root, label):
+    """Compute architectural quality metrics for a project directory."""
     root = Path(root)
     metrics = {}
 

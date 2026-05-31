@@ -6,6 +6,11 @@ import re
 import sys
 from pathlib import Path
 
+DEFAULT_CONTRACT_MAX_TOKENS = 500
+DEFAULT_RECOVERY_MAX_TOKENS = 800
+MAX_MODULES_PER_MANAGER = 7
+MIN_STATE_CHARS = 30
+
 # Make tools/ importable when this plugin is loaded from a checks/ dir
 # that's a sibling of tools/.
 _TOOLS_DIR = Path(__file__).resolve().parent.parent / 'tools'
@@ -99,7 +104,7 @@ def check_p1_contracts_over_code(root, contracts, result, module_paths=None):
 
 def check_p2_tokens_are_bottleneck(root, contracts, result, conventions=None, module_paths=None):
     """P2: Single contract within token_thresholds.contract_max."""
-    max_tokens = 500  # fallback
+    max_tokens = DEFAULT_CONTRACT_MAX_TOKENS
     if conventions:
         max_tokens = (conventions.get("token_thresholds") or {}).get("contract_max", max_tokens)
     if module_paths is None:
@@ -135,7 +140,7 @@ def check_p3_state_is_explicit(root, contracts, result, module_paths=None):
             content = state_path.read_text(encoding='utf-8').strip()
         except (OSError, UnicodeDecodeError):
             continue
-        if len(content) < 30:
+        if len(content) < MIN_STATE_CHARS:
             result.warning(mod_name,
                 f"P3 STATE.yaml nearly empty ({len(content)} chars) for {status} module")
         for marker in ['TODO', 'TBD', 'placeholder']:
@@ -209,14 +214,14 @@ def check_p5_hierarchy_is_real(root, contracts, manifest, result):
         elif manager:
             manager_loads.setdefault(manager, []).append(mod_name)
     for manager, modules in manager_loads.items():
-        if len(modules) > 7:
+        if len(modules) > MAX_MODULES_PER_MANAGER:
             result.warning(manager,
-                f"P5 owns {len(modules)} modules (max 7): {', '.join(modules)}")
+                f"P5 owns {len(modules)} modules (max {MAX_MODULES_PER_MANAGER}): {', '.join(modules)}")
 
 
 def check_p6_recovery_is_cheap(root, contracts, result, conventions=None, module_paths=None):
     """P6: Module recovery (CONTRACT+STATE+MEMORY) within token_thresholds.recovery_max."""
-    max_tokens = 800  # fallback
+    max_tokens = DEFAULT_RECOVERY_MAX_TOKENS
     if conventions:
         max_tokens = (conventions.get("token_thresholds") or {}).get("recovery_max", max_tokens)
     if module_paths is None:

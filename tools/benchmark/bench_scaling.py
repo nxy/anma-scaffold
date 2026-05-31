@@ -30,6 +30,7 @@ failed = 0
 
 
 def check(name, condition, detail=""):
+    """Assert a test condition and track pass/fail counts."""
     global passed, failed
     if condition:
         print(f"  ✓ {name}")
@@ -40,12 +41,14 @@ def check(name, condition, detail=""):
 
 
 def timed(cmd, cwd):
+    """Run a subprocess and return (elapsed_seconds, returncode, stdout)."""
     start = time.perf_counter()
     r = subprocess.run(cmd, capture_output=True, text=True, cwd=str(cwd))
     return time.perf_counter() - start, r.returncode, r.stdout
 
 
 def create_project(root, nm, nd):
+    """Scaffold a benchmark project with nm modules across nd domains."""
     root = Path(root)
     shutil.copy2(str(PROJECT_ROOT / 'CONVENTIONS.yaml'), str(root / 'CONVENTIONS.yaml'))
     for d in ['BUS/deltas', 'BUS/requests', 'checks']:

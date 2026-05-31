@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 
 def init_project(root):
+    """Clear example modules and reset the project to a blank slate."""
     root = Path(root)
 
     removed = []

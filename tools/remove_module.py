@@ -9,6 +9,7 @@ from yaml_utils import load_all_contracts, parse_yaml_file
 from discover import discover_modules
 
 def find_project_root(start='.'):
+    """Locate the nearest ancestor directory containing MANIFEST.yaml."""
     p = Path(start).resolve()
     if (p / 'MANIFEST.yaml').exists(): return p
     for parent in p.parents:
@@ -16,6 +17,7 @@ def find_project_root(start='.'):
     return p
 
 def check_consumers(root, name, module_paths=None):
+    """Return list of modules that consume the given module."""
     contracts = load_all_contracts(root, module_paths=module_paths)
     consumers = []
     for mod_name, contract in contracts.items():
@@ -28,6 +30,7 @@ def check_consumers(root, name, module_paths=None):
     return consumers
 
 def clean_bus(root, name):
+    """Remove BUS delta/request files that reference the given module."""
     bus_dir = root / 'BUS'; removed = 0
     if bus_dir.is_dir():
         for sub in ['deltas', 'requests']:

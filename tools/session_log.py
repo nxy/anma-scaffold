@@ -16,6 +16,8 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
+MAX_HISTORY_ENTRIES = 50
+
 
 def log_activity(root, action, script_name):
     """Append an activity entry to SESSION-HISTORY.yaml. Fails silently."""
@@ -68,11 +70,10 @@ def log_activity(root, action, script_name):
             if insert_idx is not None:
                 lines.insert(insert_idx + 1, entry)
 
-        # Keep only last 50 entries to prevent unbounded growth
         entry_count = sum(1 for l in lines if l.strip().startswith('- timestamp:'))
-        if entry_count > 50:
+        if entry_count > MAX_HISTORY_ENTRIES:
             # Find and remove oldest entries
-            remove_count = entry_count - 50
+            remove_count = entry_count - MAX_HISTORY_ENTRIES
             removed = 0
             new_lines = []
             skip_entry = False

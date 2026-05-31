@@ -78,6 +78,7 @@ GROUP_COMMANDS = {
 
 
 def print_help():
+    """Display available commands and usage information."""
     print("ANMA CLI — unified entry point for all scaffold tools.\n")
     print("Usage: anma <command> [args...]\n")
     print("Commands:")

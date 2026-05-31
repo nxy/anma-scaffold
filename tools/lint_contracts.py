@@ -27,6 +27,10 @@ from yaml_utils import (
     _cached_parse, _parse_cache,
 )
 
+STALE_REQUEST_DAYS = 7
+BUDGET_PER_MODULE_BONUS = 50
+BUDGET_SCALING_BASELINE = 4
+
 
 # ---------------------------------------------------------------------------
 # Linter checks
@@ -851,9 +855,8 @@ def check_context_budget(root, contracts, conventions, result, module_paths=None
     # Scale thresholds for large projects: shared context (MANIFEST, GRAPH)
     # grows ~50 tokens per module, so fixed thresholds penalize large projects.
     total_module_count = len(module_paths)
-    per_module_bonus = 50
-    if total_module_count > 4:  # only scale above baseline (original scaffold has 2)
-        extra = (total_module_count - 4) * per_module_bonus
+    if total_module_count > BUDGET_SCALING_BASELINE:
+        extra = (total_module_count - BUDGET_SCALING_BASELINE) * BUDGET_PER_MODULE_BONUS
         warn_tokens += extra
         error_tokens += extra
 
@@ -1566,7 +1569,7 @@ def check_version_pinning(contracts, all_contracts, result):
 # Check 22: Stale BUS requests
 # ---------------------------------------------------------------------------
 
-def check_stale_requests(root, result, stale_days=7):
+def check_stale_requests(root, result, stale_days=STALE_REQUEST_DAYS):
     """Warn on open BUS requests older than stale_days."""
     print("── Check 22: Stale requests ──")
 

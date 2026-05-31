@@ -18,6 +18,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from yaml_utils import parse_yaml_file
 
+MIN_MANIFEST_COL_WIDTH = 19
+
 
 # ---------------------------------------------------------------------------
 # MANIFEST.yaml
@@ -45,7 +47,7 @@ def write_manifest(root, data):
     if isinstance(modules, dict) and modules:
         # Calculate alignment width
         max_name = max(len(n) for n in modules) if modules else 0
-        width = max(max_name + 2, 19)  # minimum 19 for readability
+        width = max(max_name + 2, MIN_MANIFEST_COL_WIDTH)
         for name, entry in modules.items():
             if isinstance(entry, dict):
                 parts = []

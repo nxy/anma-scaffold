@@ -6,6 +6,7 @@ import argparse, re, sys
 from pathlib import Path
 
 def find_project_root(start='.'):
+    """Locate the nearest ancestor directory containing MANIFEST.yaml."""
     p = Path(start).resolve()
     if (p / 'MANIFEST.yaml').exists(): return p
     for parent in p.parents:
