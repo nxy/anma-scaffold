@@ -102,7 +102,9 @@ anma dashboard                               # project overview
 anma diff <module>                           # show contract changes
 anma impact <module>                         # downstream impact analysis
 anma compat                                  # compatibility matrix
-anma viz                                     # dependency graph (DOT format)
+anma graph viz                               # dependency graph (DOT format)
+anma verify <module>                         # verify contract implementation
+anma migrate <module>                        # plan a contract migration
 ```
 
 ### Multi-Agent
@@ -120,4 +122,15 @@ anma gentests                                # regenerate test specs
 anma claude                                  # regenerate CLAUDE.md
 anma spec                                    # generate product spec
 anma rename <new-name>                       # rename the project
+```
+
+### Other
+
+```bash
+anma graph                                   # generate/check dependency graph
+anma bus archive                             # archive old BUS entries
+anma contract <module>                       # generate contract template
+anma manager add <name>                      # scaffold a new manager
+anma test                                    # run unit tests
+anma smoke                                   # run smoke tests
 ```

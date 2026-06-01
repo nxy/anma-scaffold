@@ -4,13 +4,13 @@ Get a working ANMA project in 5 minutes.
 
 ## Prerequisites
 
-- Python 3.8+
+- Python 3.10+
 - `pip install pyyaml`
 
 ## Step 1: Clone
 
 ```bash
-git clone https://github.com/nxy/anma-scaffold my-project
+git clone https://github.com/anma-labs/anma-scaffold my-project
 cd my-project
 ```
 
